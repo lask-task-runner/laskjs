@@ -4,7 +4,7 @@ import { LaskLogger } from "./LaskLogger.ts";
 
 export type JSON = null | boolean | number | string | JSON[] | { [key: string]: JSON };
 
-export type Task<T extends JSON> = (input: T, effect: Effect) => JSON;
+export type Task<T extends JSON> = (input: T, effect: Effect) => Promise<JSON>;
 
 class Lask {
   private tasks: { [name: string]: Task<JSON> } = {};
@@ -22,7 +22,7 @@ class Lask {
   /**
    * Run the Lask CLI. Parse command-line arguments and execute tasks.
    */
-  bite() {
+  async bite() {
     const taskName = Deno.args[0];
     const input = Deno.stdin.isTerminal()
       ? "null"
@@ -33,7 +33,7 @@ class Lask {
     if (task) {
       const effect = new Effect(`Task#${taskName}`);
       const parsedInput = JSON.parse(input);
-      const output = task(parsedInput, effect);
+      const output = await task(parsedInput, effect);
       console.log(JSON.stringify(output));
     } else {
       this.logger.error(`Task not found: ${taskName}`);
