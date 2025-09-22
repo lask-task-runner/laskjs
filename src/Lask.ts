@@ -2,12 +2,12 @@ import { readAllSync } from "jsr:@std/io/read-all";
 import { Effect } from "./Effect.ts";
 import { LaskLogger } from "./LaskLogger.ts";
 
-export type JSON = null | boolean | number | string | JSON[] | { [key: string]: JSON };
+export type JSON = void | null | boolean | number | string | JSON[] | { [key: string]: JSON };
 
-export type Task<T extends JSON> = (input: T, effect: Effect) => Promise<JSON>;
+export type Task<T extends JSON, R extends JSON> = (input: T, effect: Effect) => Promise<R>;
 
-class Lask {
-  private tasks: { [name: string]: Task<JSON> } = {};
+export class Lask {
+  private tasks: { [name: string]: (input: JSON) => Promise<JSON> } = {};
   private logger: LaskLogger = new LaskLogger("Main");
 
   /**
@@ -15,8 +15,14 @@ class Lask {
    * @param name The name of the task.
    * @param task The task function.
    */
-  task<T extends JSON>(name: string, task: Task<T>): void {
-    this.tasks[name] = task as Task<JSON>;
+  task<T extends JSON, R extends JSON>(
+    name: string,
+    task: (input: T, effect: Effect) => Promise<R>,
+  ): (input: T) => Promise<R> {
+    const f = (input: T) => task(input, effect);
+    this.tasks[name] = f as unknown as (input: JSON) => Promise<JSON>;
+    const effect = new Effect(`Task#${name}`);
+    return f;
   }
 
   /**
@@ -25,20 +31,17 @@ class Lask {
   async bite() {
     const taskName = Deno.args[0];
     const input = Deno.stdin.isTerminal()
-      ? "null"
+      ? undefined
       : new TextDecoder().decode(readAllSync(Deno.stdin));
 
     const task = this.tasks[taskName];
 
     if (task) {
-      const effect = new Effect(`Task#${taskName}`);
-      const parsedInput = JSON.parse(input);
-      const output = await task(parsedInput, effect);
-      console.log(JSON.stringify(output));
+      const parsedInput = input === undefined ? undefined : JSON.parse(input);
+      const output = await task(parsedInput);
+      if (output !== undefined) console.log(JSON.stringify(output));
     } else {
       this.logger.error(`Task not found: ${taskName}`);
     }
   }
 }
-
-export { Lask };
