@@ -2,9 +2,25 @@ import { readAllSync } from "jsr:@std/io/read-all";
 import { Effect } from "./Effect.ts";
 import { LaskLogger } from "./LaskLogger.ts";
 
-export type JSON = void | null | boolean | number | string | JSON[] | { [key: string]: JSON };
+export type JSONDocument =
+  | { type: "void"; description?: string }
+  | { type: "null"; description?: string }
+  | { type: "boolean"; description?: string }
+  | { type: "number"; description?: string }
+  | { type: "string"; description?: string }
+  | { type: "array"; elements: JSONDocument; description?: string }
+  | { type: "object"; properties: { [key: string]: JSONDocument }; description?: string };
 
-export type Task<T extends JSON, R extends JSON> = (input: T, effect: Effect) => Promise<R>;
+export type JSONType<T extends JSONDocument> = T extends { type: "void" } ? void
+  : T extends { type: "null" } ? null
+  : T extends { type: "boolean" } ? boolean
+  : T extends { type: "number" } ? number
+  : T extends { type: "string" } ? string
+  : T extends { type: "array"; elements: infer E } ? E extends JSONDocument ? JSONType<E>[] : never
+  : T extends { type: "object"; properties: infer P }
+    ? P extends { [key: string]: JSONDocument } ? { [K in keyof P]: JSONType<P[K]> }
+    : never
+  : never;
 
 export class Lask {
   private tasks: { [name: string]: (input: JSON) => Promise<JSON> } = {};
@@ -13,13 +29,17 @@ export class Lask {
   /**
    * Register a new task.
    * @param name The name of the task.
+   * @param args The JSON schema for the task's input.
+   * @param returns The JSON schema for the task's output.
    * @param task The task function.
    */
-  task<T extends JSON, R extends JSON>(
+  task<T extends JSONDocument, R extends JSONDocument>(
     name: string,
-    task: (input: T, effect: Effect) => Promise<R>,
-  ): (input: T) => Promise<R> {
-    const f = (input: T) => task(input, effect);
+    _args: T = { type: "void" } as T,
+    _returns: R = { type: "void" } as R,
+    task: (input: JSONType<T>, effect: Effect) => Promise<JSONType<R>>,
+  ): (input: JSONType<T>) => Promise<JSONType<R>> {
+    const f = (input: JSONType<T>) => task(input, effect);
     this.tasks[name] = f as unknown as (input: JSON) => Promise<JSON>;
     const effect = new Effect(`Task#${name}`);
     return f;
