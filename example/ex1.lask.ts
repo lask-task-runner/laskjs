@@ -4,17 +4,25 @@ const lask: Lask = new Lask();
 
 lask.task(
   "add",
-  { type: "array", elements: { type: "number" } },
-  { type: "number" },
-  (input, effect) => {
-    effect.info(`Adding numbers [${input.join(", ")}]`);
-    return Promise.resolve(input.reduce((a, b) => a + b, 0));
+  {
+    parameters: {
+      a: { type: "number", description: "First number" },
+      b: { type: "number", description: "Second number" },
+    },
+    // input: { type: "array", elements: { type: "number" } },
+    output: { type: "number" },
+    handler: ({ a, b }, _input, effect) => {
+      effect.info(`a: ${a}, b: ${b}`);
+      return Promise.resolve(a + b);
+    },
   },
 );
 
-lask.task("ls", { type: "void" }, { type: "void" }, async (_, effect) => {
-  effect.info("Listing current directory contents");
-  await effect.$("ls -la");
+lask.task("ls", {
+  handler: async (params, _, effect) => {
+    effect.info("Listing current directory contents");
+    await effect.$("ls -la");
+  },
 });
 
 await lask.bite();
