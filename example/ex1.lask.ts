@@ -1,28 +1,23 @@
+import { JSONSignature } from "../src/DataType/JSON.ts";
 import { Lask } from "../src/Lask.ts";
 
-const lask: Lask = new Lask();
+const lask = new Lask();
 
 lask.task(
   "add",
-  {
-    parameters: {
-      a: { type: "number", description: "First number" },
-      b: { type: "number", description: "Second number" },
-    },
-    // input: { type: "array", elements: { type: "number" } },
+  JSONSignature({
+    input: { type: "array", elements: { type: "number" } },
     output: { type: "number" },
-    handler: ({ a, b }, _input, effect) => {
-      effect.info(`a: ${a}, b: ${b}`);
-      return Promise.resolve(a + b);
-    },
+  }),
+  (ns, effect) => {
+    effect.info(`Adding numbers: [${ns.join(", ")}]`);
+    return Promise.resolve(ns.reduce((a, b) => a + b, 0));
   },
 );
 
-lask.task("ls", {
-  handler: async (params, _, effect) => {
-    effect.info("Listing current directory contents");
-    await effect.$("ls -la");
-  },
+lask.task("ls", JSONSignature({}), async (_input, effect) => {
+  effect.info("Listing current directory contents");
+  await effect.$("ls -la");
 });
 
 await lask.bite();
