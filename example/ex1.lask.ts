@@ -6,16 +6,19 @@ const lask = new Lask();
 lask.task(
   "add",
   JSONSignature({
-    input: { type: "array", elements: { type: "number" } },
+    param: {
+      a: { type: "number", description: "First number" },
+      b: { type: "number", description: "Second number" },
+    },
     output: { type: "number" },
   }),
-  (ns, effect) => {
-    effect.info(`Adding numbers: [${ns.join(", ")}]`);
-    return Promise.resolve(ns.reduce((a, b) => a + b, 0));
+  ({ a, b }, _input, effect) => {
+    effect.info(`Adding two numbers: ${a} ${b}`);
+    return Promise.resolve(a + b);
   },
 );
 
-lask.task("ls", JSONSignature({}), async (_input, effect) => {
+lask.task("ls", JSONSignature({}), async (_param, _input, effect) => {
   effect.info("Listing current directory contents");
   await effect.$("ls -la");
 });

@@ -1,7 +1,30 @@
 import { readAllSync } from "jsr:@std/io/read-all";
-import { command, run, subcommands } from "npm:cmd-ts";
+import { command, number, positional, run, string, subcommands } from "npm:cmd-ts";
 import { Effect } from "./Effect.ts";
 import { LaskLogger } from "./LaskLogger.ts";
+
+/**
+ * Parameter schema definition for task parameters.
+ */
+export type ParamSchema = {
+  [key: string]: {
+    type: "string" | "number";
+    description?: string;
+    required?: boolean;
+  };
+};
+
+/**
+ * Type mapping for parameter schema to actual TypeScript types.
+ *
+ * @template P Parameter schema type
+ */
+export type ParamType<P extends ParamSchema> = {
+  [K in keyof P]: P[K] extends { type: "string" } ? string
+    : P[K] extends { type: "number" } ? number
+    : P[K] extends { type: "boolean" } ? boolean
+    : never;
+};
 
 /**
  * Decoder interface for converting string data to typed objects.
@@ -66,10 +89,13 @@ export type OutputSignature<OS> = {
  * Complete signature configuration combining input and output specifications.
  * Used to define the data flow contract for a task.
  *
+ * @template P Parameter schema type
  * @template IS Input schema type
  * @template OS Output schema type
  */
-export type Signature<IS, OS> = {
+export type Signature<P extends ParamSchema, IS, OS> = {
+  /** Optional parameter schema for input validation */
+  param?: P;
   /** Input signature configuration */
   input?: InputSignature<IS>;
   /** Output signature configuration */
@@ -80,19 +106,21 @@ export type Signature<IS, OS> = {
  * Task handler function type.
  * Defines the contract for task implementation with effect capabilities.
  *
+ * @template P Parameter data type
  * @template I Input data type
  * @template O Output data type
  */
-export type Handler<I, O> = (input: I, effect: Effect) => Promise<O>;
+export type Handler<P, I, O> = (param: P, input: I, effect: Effect) => Promise<O>;
 
 /**
  * Pure function type without effect capabilities.
  * Represents a simplified task execution interface.
  *
+ * @template P Parameter data type
  * @template I Input data type
  * @template O Output data type
  */
-export type Func<I, O> = (input: I) => Promise<O>;
+export type Func<P, I, O> = (param: P, input: I) => Promise<O>;
 
 /**
  * Higher Kinded Type (HKT) interface for schema-to-type mapping.
@@ -129,8 +157,10 @@ export class Lask<ISS, OSS> {
    * Registry of registered tasks with their functions and signatures.
    * Maps task names to their execution functions and metadata.
    */
-  // deno-lint-ignore no-explicit-any
-  private tasks: { [key: string]: { func: Func<any, any>; signature: Signature<ISS, OSS> } } = {};
+  private tasks: {
+    // deno-lint-ignore no-explicit-any
+    [key: string]: { func: Func<any, any, any>; signature: Signature<ParamSchema, ISS, OSS> };
+  } = {};
 
   /**
    * Register a new task with type-safe schema validation.
@@ -139,6 +169,7 @@ export class Lask<ISS, OSS> {
    * between the schema definitions and the actual handler implementation.
    * The registered task can be executed both directly as a function and through the CLI.
    *
+   * @template P Parameter Schema
    * @template IS Input Schema - Must extend the input schema set (ISS)
    * @template IT Input Type - The resolved TypeScript type from input schema
    * @template OS Output Schema - Must extend the output schema set (OSS)
@@ -151,18 +182,21 @@ export class Lask<ISS, OSS> {
    * @returns A pure function that can be called directly without effects
    */
   task<
+    P extends ParamSchema,
     IS extends ISS,
     IT extends keyof SchemaToType<IS>,
     OS extends OSS,
     OT extends keyof SchemaToType<OS>,
   >(
     name: string,
-    signature: Signature<IS, OS>,
-    handler: Handler<SchemaToType<IS>[IT], SchemaToType<OS>[OT]>,
-  ): Func<SchemaToType<IS>[IT], SchemaToType<OS>[OT]> {
+    signature: Signature<P, IS, OS>,
+    handler: Handler<ParamType<P>, SchemaToType<IS>[IT], SchemaToType<OS>[OT]>,
+  ): Func<ParamType<P>, SchemaToType<IS>[IT], SchemaToType<OS>[OT]> {
     const effect = new Effect(`Task#${name}`);
-    const func = (input: SchemaToType<IS>[IT]): Promise<SchemaToType<OS>[OT]> =>
-      handler(input, effect);
+    const func = (
+      param: ParamType<P>,
+      input: SchemaToType<IS>[IT],
+    ): Promise<SchemaToType<OS>[OT]> => handler(param, input, effect);
     this.tasks[name] = {
       func,
       signature,
@@ -200,8 +234,17 @@ export class Lask<ISS, OSS> {
       // Create a cmd-ts command for each registered task
       commands[taskName] = command({
         name: taskName,
-        args: {}, // TODO: Support positional arguments from schema
-        handler: async (_args) => {
+        args: Object.entries(task.signature.param ?? {})
+          .reduce((acc, [name, schema]) => {
+            acc[name] = positional({
+              type: schema.type === "string" ? string : schema.type === "number" ? number : string,
+              displayName: name,
+              description: schema.description,
+            });
+            return acc;
+            // deno-lint-ignore no-explicit-any
+          }, {} as { [key: string]: any }),
+        handler: async (args) => {
           // Read input from stdin if available (non-terminal mode)
           const input = Deno.stdin.isTerminal()
             ? undefined
@@ -213,7 +256,7 @@ export class Lask<ISS, OSS> {
             : task.signature.input?.decoder?.decode(input);
 
           // Execute the task function
-          const output = await task.func(parsedInput);
+          const output = await task.func(args, parsedInput);
 
           // Format and output result using registered encoder
           if (output !== undefined) {

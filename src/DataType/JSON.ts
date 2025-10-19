@@ -1,4 +1,4 @@
-import { Decoder, Encoder, Signature } from "../Lask.ts";
+import { Decoder, Encoder, ParamSchema, Signature } from "../Lask.ts";
 
 export type JSONSchema =
   | { type: "void"; description?: string }
@@ -32,10 +32,13 @@ export class JSONEncoder<T extends JSONSchema> implements Encoder<JSONType<T>> {
   }
 }
 
-export function JSONSignature<IS extends JSONSchema, OS extends JSONSchema>(schema: {
-  input?: IS;
-  output?: OS;
-}): Signature<IS, OS> {
+export function JSONSignature<P extends ParamSchema, IS extends JSONSchema, OS extends JSONSchema>(
+  schema: {
+    param?: P;
+    input?: IS;
+    output?: OS;
+  },
+): Signature<P, IS, OS> {
   return {
     input: {
       schema: schema.input,
@@ -45,6 +48,7 @@ export function JSONSignature<IS extends JSONSchema, OS extends JSONSchema>(sche
       schema: schema.output,
       encoder: new JSONEncoder<OS>() as Encoder<OS>,
     },
+    param: schema.param,
   };
 }
 
