@@ -1,5 +1,5 @@
 import { readAllSync } from "jsr:@std/io/read-all";
-import { command, number, positional, run, string, subcommands } from "npm:cmd-ts";
+import * as cmd from "npm:cmd-ts";
 import { Effect } from "./Effect.ts";
 import { LaskLogger } from "./LaskLogger.ts";
 
@@ -110,7 +110,11 @@ export type Signature<P extends ParamSchema, IS, OS> = {
  * @template I Input data type
  * @template O Output data type
  */
-export type Handler<P, I, O> = (param: P, input: I, effect: Effect) => Promise<O>;
+export type Handler<P, I, O> = (
+  param: P,
+  input: I,
+  effect: Effect,
+) => Promise<O>;
 
 /**
  * Pure function type without effect capabilities.
@@ -190,13 +194,22 @@ export class Lask<ISS, OSS> {
   >(
     name: string,
     signature: Signature<P, IS, OS>,
-    handler: Handler<ParamType<P>, SchemaToType<IS>[IT], SchemaToType<OS>[OT]>,
-  ): Func<ParamType<P>, SchemaToType<IS>[IT], SchemaToType<OS>[OT]> {
+    handler: Handler<
+      ParamType<P>,
+      SchemaToType<IS>[IT],
+      SchemaToType<OS>[OT] extends never ? void : SchemaToType<OS>[OT]
+    >,
+  ): Func<
+    ParamType<P>,
+    SchemaToType<IS>[IT],
+    SchemaToType<OS>[OT] extends never ? void : SchemaToType<OS>[OT]
+  > {
     const effect = new Effect(`Task#${name}`);
     const func = (
       param: ParamType<P>,
       input: SchemaToType<IS>[IT],
-    ): Promise<SchemaToType<OS>[OT]> => handler(param, input, effect);
+    ): Promise<SchemaToType<OS>[OT] extends never ? void : SchemaToType<OS>[OT]> =>
+      handler(param, input, effect);
     this.tasks[name] = {
       func,
       signature,
@@ -232,12 +245,16 @@ export class Lask<ISS, OSS> {
       const task = this.tasks[taskName];
 
       // Create a cmd-ts command for each registered task
-      commands[taskName] = command({
+      commands[taskName] = cmd.command({
         name: taskName,
         args: Object.entries(task.signature.param ?? {})
           .reduce((acc, [name, schema]) => {
-            acc[name] = positional({
-              type: schema.type === "string" ? string : schema.type === "number" ? number : string,
+            acc[name] = cmd.positional({
+              type: schema.type === "string"
+                ? cmd.string
+                : schema.type === "number"
+                ? cmd.number
+                : cmd.string,
               displayName: name,
               description: schema.description,
             });
@@ -269,12 +286,12 @@ export class Lask<ISS, OSS> {
     }
 
     // Create the main CLI application with subcommands
-    const lask = subcommands({
+    const lask = cmd.subcommands({
       name: "lask",
       cmds: commands,
     });
 
     // Start the CLI application with provided arguments
-    await run(lask, Deno.args);
+    await cmd.run(lask, Deno.args);
   }
 }

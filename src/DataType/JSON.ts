@@ -1,4 +1,4 @@
-import { Decoder, Encoder, ParamSchema, Signature } from "../Lask.ts";
+import { Decoder, Encoder, InputSignature, OutputSignature } from "../Lask.ts";
 
 export type JSONSchema =
   | { type: "void"; description?: string }
@@ -32,28 +32,22 @@ export class JSONEncoder<T extends JSONSchema> implements Encoder<JSONType<T>> {
   }
 }
 
-export function JSONSignature<P extends ParamSchema, IS extends JSONSchema, OS extends JSONSchema>(
-  schema: {
-    param?: P;
-    input?: IS;
-    output?: OS;
-  },
-): Signature<P, IS, OS> {
+export function JSONInput<T extends JSONSchema>(schema: T): InputSignature<T> {
   return {
-    input: {
-      schema: schema.input,
-      decoder: new JSONDecoder<IS>() as Decoder<IS>,
-    },
-    output: {
-      schema: schema.output,
-      encoder: new JSONEncoder<OS>() as Encoder<OS>,
-    },
-    param: schema.param,
+    schema,
+    decoder: new JSONDecoder<T>() as Decoder<T>,
+  };
+}
+
+export function JSONOutput<T extends JSONSchema>(schema: T): OutputSignature<T> {
+  return {
+    schema,
+    encoder: new JSONEncoder<T>() as Encoder<T>,
   };
 }
 
 declare module "../Lask.ts" {
   interface SchemaToType<T> {
-    JSONSchema: JSONType<T extends JSONSchema ? T : never>;
+    JSONSchema: T extends JSONSchema ? JSONType<T> : never;
   }
 }
