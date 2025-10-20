@@ -1,7 +1,6 @@
 import { Decoder, Encoder, InputSignature, OutputSignature } from "../Lask.ts";
 
 export type JSONSchema =
-  | { type: "void"; description?: string }
   | { type: "null"; description?: string }
   | { type: "boolean"; description?: string }
   | { type: "number"; description?: string }
@@ -9,8 +8,7 @@ export type JSONSchema =
   | { type: "array"; elements: JSONSchema; description?: string }
   | { type: "object"; properties: { [key: string]: JSONSchema }; description?: string };
 
-export type JSONType<T extends JSONSchema> = T extends { type: "void" } ? void
-  : T extends { type: "null" } ? null
+export type JSONType<T extends JSONSchema> = T extends { type: "null" } ? null
   : T extends { type: "boolean" } ? boolean
   : T extends { type: "number" } ? number
   : T extends { type: "string" } ? string
