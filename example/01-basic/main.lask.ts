@@ -1,26 +1,46 @@
-import { JSONOutput } from "../../src/DataType/JSON.ts";
-import { Lask } from "../../src/Lask.ts";
+import { json } from "../../src/DataType/JSON.ts";
+import { input, Lask, output, param } from "../../src/Lask.ts";
+import { stdin } from "../../src/Reader.ts";
+import { stdout } from "../../src/Writer.ts";
 
 const lask = new Lask();
 
 lask.task(
-  "add",
+  "create-file",
   {
-    param: {
-      a: { type: "number", description: "First number" },
-      b: { type: "number", description: "Second number" },
-    },
-    output: JSONOutput({ type: "number" }),
+    filename: param("string"),
+    content: input(stdin, json({ type: "string" })),
   },
-  ({ a, b }, _input, effect) => {
-    effect.info(`Adding two numbers: ${a} ${b}`);
-    return Promise.resolve(a + b);
+  {
+    output: output(stdout, json({ type: "string" })),
+  },
+  async ({ filename, content }, effect) => {
+    effect.info(`Creating file: ${filename}`);
+    effect.info(`With content: ${content}`);
+    await Deno.writeTextFile(filename, content);
+    return { output: "OK" };
   },
 );
 
-lask.task("ls", {}, async (_param, _input, effect) => {
+lask.task(
+  "add",
+  {
+    a: param("number"),
+    b: param("number"),
+  },
+  {
+    output: output(stdout, json({ type: "number" })),
+  },
+  ({ a, b }, effect) => {
+    effect.info(`Adding two numbers: ${a} ${b}`);
+    return Promise.resolve({ output: a + b });
+  },
+);
+
+lask.task("ls", {}, {}, async (_inputs, effect) => {
   effect.info("Listing current directory contents");
   await effect.$("ls -la");
+  return {};
 });
 
 await lask.bite();
