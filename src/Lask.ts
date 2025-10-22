@@ -24,6 +24,12 @@ export type Input<T> = {
   type: "string" | "number";
   description?: string;
 } | {
+  kind: "option";
+  type: "string" | "number";
+  long: string;
+  short?: string;
+  description?: string;
+} | {
   kind: "custom";
   decoder: Decoder<T>;
   reader: Reader;
@@ -34,13 +40,27 @@ export interface Output<T> {
   writer: Writer;
 }
 
-export function param<T extends ParamSchema>(type: T, description?: string): Input<T> {
-  return { kind: "param", type, description };
+export function param<T extends ParamSchema>(
+  param: { type: T; description?: string },
+): Input<T> {
+  return { kind: "param", ...param };
+}
+
+export function option<T extends OptionSchema>(
+  option: { type: T; long: string; short?: string; description?: string },
+): Input<T> {
+  return { kind: "option", ...option };
 }
 
 export type ParamSchema = "string" | "number";
 
+export type OptionSchema = "string" | "number";
+
 export type ParamType<T extends ParamSchema> = T extends "string" ? string
+  : T extends "number" ? number
+  : never;
+
+export type OptionType<T extends OptionSchema> = T extends "string" ? string
   : T extends "number" ? number
   : never;
 
@@ -58,6 +78,7 @@ export type Func<I, O> = (input: I) => Promise<O>;
 
 export interface SchemaToType<T> {
   ParamSchema: T extends ParamSchema ? ParamType<T> : never;
+  OptionSchema: T extends OptionSchema ? OptionType<T> : never;
 }
 
 export class Lask {
@@ -119,14 +140,21 @@ export class Lask {
         args: Object.keys(task.inputs).reduce((acc, key) => {
           const input = task.inputs[key];
 
-          if (input.kind !== "param") {
-            return acc;
+          if (input.kind === "param") {
+            acc[key] = cmd.positional({
+              type: input.type === "string" ? cmd.string : cmd.number,
+              description: input.description,
+            });
           }
 
-          acc[key] = cmd.positional({
-            type: input.type === "string" ? cmd.string : cmd.number,
-            description: input.description,
-          });
+          if (input.kind === "option") {
+            acc[key] = cmd.option({
+              type: input.type === "string" ? cmd.string : cmd.number,
+              long: input.long,
+              short: input.short,
+              description: input.description,
+            });
+          }
 
           return acc;
           // deno-lint-ignore no-explicit-any

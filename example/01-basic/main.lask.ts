@@ -2,7 +2,7 @@ import { json } from "../../src/Codec/JSON.ts";
 import { string } from "../../src/Codec/String.ts";
 import { stdin, stdout } from "../../src/IO/Console.ts";
 import { file } from "../../src/IO/File.ts";
-import { input, Lask, output, param } from "../../src/Lask.ts";
+import { input, Lask, option, output } from "../../src/Lask.ts";
 
 const lask = new Lask();
 
@@ -23,8 +23,8 @@ lask.task(
 lask.task(
   "add",
   {
-    a: param("number"),
-    b: param("number"),
+    a: option({ type: "number", long: "a", short: "a" }),
+    b: option({ type: "number", long: "b", short: "b" }),
   },
   {
     output: output(stdout, json({ type: "number" })),
