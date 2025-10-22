@@ -1,24 +1,22 @@
-import { json } from "../../src/DataType/JSON.ts";
+import { json } from "../../src/Codec/JSON.ts";
+import { string } from "../../src/Codec/String.ts";
+import { stdin, stdout } from "../../src/IO/Console.ts";
+import { file } from "../../src/IO/File.ts";
 import { input, Lask, output, param } from "../../src/Lask.ts";
-import { stdin } from "../../src/Reader.ts";
-import { stdout } from "../../src/Writer.ts";
 
 const lask = new Lask();
 
 lask.task(
-  "create-file",
+  "write-file",
   {
-    filename: param("string"),
-    content: input(stdin, json({ type: "string" })),
+    content: input(stdin, string("Input content to write to file")),
   },
   {
-    output: output(stdout, json({ type: "string" })),
+    file: output(file("output.txt"), string("Output file content")),
   },
-  async ({ filename, content }, effect) => {
-    effect.info(`Creating file: ${filename}`);
+  ({ content }, effect) => {
     effect.info(`With content: ${content}`);
-    await Deno.writeTextFile(filename, content);
-    return { output: "OK" };
+    return Promise.resolve({ file: content });
   },
 );
 
