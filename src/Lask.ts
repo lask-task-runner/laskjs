@@ -20,13 +20,14 @@ export interface Writer {
 }
 
 export type Input<T> = {
+  kind: "param";
+  type: "string" | "number";
+} | {
   kind: "custom";
   decoder: Decoder<T>;
   reader: Reader;
-} | {
-  kind: "param";
-  type: "string" | "number";
 };
+
 export interface Output<T> {
   encoder: Encoder<T>;
   writer: Writer;
