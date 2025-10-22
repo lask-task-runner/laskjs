@@ -22,6 +22,7 @@ export interface Writer {
 export type Input<T> = {
   kind: "param";
   type: "string" | "number";
+  description?: string;
 } | {
   kind: "custom";
   decoder: Decoder<T>;
@@ -33,8 +34,8 @@ export interface Output<T> {
   writer: Writer;
 }
 
-export function param<T extends ParamSchema>(type: T): Input<T> {
-  return { kind: "param", type };
+export function param<T extends ParamSchema>(type: T, description?: string): Input<T> {
+  return { kind: "param", type, description };
 }
 
 export type ParamSchema = "string" | "number";
@@ -124,6 +125,7 @@ export class Lask {
 
           acc[key] = cmd.positional({
             type: input.type === "string" ? cmd.string : cmd.number,
+            description: input.description,
           });
 
           return acc;
