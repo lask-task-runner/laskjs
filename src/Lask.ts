@@ -62,8 +62,11 @@ export interface SchemaToType<T> {
 export class Lask {
   private tasks: {
     [key: string]: {
+      // deno-lint-ignore no-explicit-any
       func: Func<any, any>;
+      // deno-lint-ignore no-explicit-any
       inputs: { [key: string]: Input<any> };
+      // deno-lint-ignore no-explicit-any
       outputs: { [key: string]: Output<any> };
     };
   } = {};
@@ -127,6 +130,7 @@ export class Lask {
           // deno-lint-ignore no-explicit-any
         }, {} as { [key: string]: any }),
         handler: async (args) => {
+          // deno-lint-ignore no-explicit-any
           const inputs: { [key: string]: any } = {};
           for (const key of Object.keys(task.inputs)) {
             const input = task.inputs[key];
