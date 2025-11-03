@@ -1,13 +1,12 @@
-export const file = (path: string) => {
+import { Reader, Writer } from "../Lask.ts";
+
+export const file = (path: string): Reader & Writer => {
   return {
-    write: async (data: string): Promise<void> => {
-      const encoder = new TextEncoder();
-      const buffer = encoder.encode(data);
-      await Deno.writeFile(path, buffer);
+    write: async (data: Uint8Array): Promise<void> => {
+      await Deno.writeFile(path, data);
     },
-    read: async (): Promise<string> => {
-      const raw = await Deno.readFile(path);
-      return new TextDecoder().decode(raw);
+    read: async (): Promise<Uint8Array> => {
+      return await Deno.readFile(path);
     },
   };
 };

@@ -24,12 +24,12 @@ export function json<T extends JSONSchema>(schema: T): Decoder<T> & Encoder<T> {
       return schema;
     },
 
-    decode(data: string): SchemaToType<T> {
-      return JSON.parse(data);
+    decode(data: Uint8Array): SchemaToType<T> {
+      return JSON.parse(new TextDecoder().decode(data));
     },
 
-    encode(data: SchemaToType<T>): string {
-      return JSON.stringify(data, null, 2);
+    encode(data: SchemaToType<T>): Uint8Array {
+      return new TextEncoder().encode(JSON.stringify(data, null, 2));
     },
   };
 }

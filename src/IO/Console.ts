@@ -1,24 +1,20 @@
 import { readAll } from "jsr:@std/io/read-all";
+import { Reader } from "../Lask.ts";
 
-export const stdin = {
-  async read(): Promise<string> {
-    const raw = await readAll(Deno.stdin);
-    return new TextDecoder().decode(raw);
+export const stdin: Reader = {
+  read(): Promise<Uint8Array> {
+    return readAll(Deno.stdin);
   },
 };
 
 export const stdout = {
-  write: async (data: string): Promise<void> => {
-    const encoder = new TextEncoder();
-    const buffer = encoder.encode(data);
-    await Deno.stdout.write(buffer);
+  write: async (data: Uint8Array): Promise<void> => {
+    await Deno.stdout.write(data);
   },
 };
 
 export const stderr = {
-  write: async (data: string): Promise<void> => {
-    const encoder = new TextEncoder();
-    const buffer = encoder.encode(data);
-    await Deno.stderr.write(buffer);
+  write: async (data: Uint8Array): Promise<void> => {
+    await Deno.stderr.write(data);
   },
 };

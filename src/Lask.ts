@@ -3,20 +3,20 @@ import { Effect } from "./Effect.ts";
 
 export interface Decoder<T> {
   schema(): T;
-  decode(raw: string): SchemaToType<T>;
+  decode(raw: Uint8Array): SchemaToType<T>;
 }
 
 export interface Encoder<T> {
   schema(): T;
-  encode(data: SchemaToType<T>): string;
+  encode(data: SchemaToType<T>): Uint8Array;
 }
 
 export interface Reader {
-  read(): Promise<string>;
+  read(): Promise<Uint8Array>;
 }
 
 export interface Writer {
-  write(raw: string): Promise<void>;
+  write(raw: Uint8Array): Promise<void>;
 }
 
 export type Input<T> = {
@@ -131,6 +131,11 @@ export class Lask {
     return func;
   }
 
+  private async init() {
+    await Deno.mkdir(".lask");
+    await Deno.mkdir(".lask/history");
+  }
+
   async bite() {
     const commands: Record<string, ReturnType<typeof cmd.command>> = {};
     for (const taskName of Object.keys(this.tasks)) {
@@ -183,6 +188,15 @@ export class Lask {
         },
       });
     }
+
+    commands[":init"] = cmd.command({
+      name: ":init",
+      args: {},
+      handler: async () => {
+        await this.init();
+        console.log("Initialized .lask directory.");
+      },
+    });
 
     const lask = cmd.subcommands({
       name: "lask",

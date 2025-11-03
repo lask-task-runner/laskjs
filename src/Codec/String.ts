@@ -10,14 +10,14 @@ export function string<T extends StringSchema>(description?: string): Decoder<T>
       return { type: "string", description } as T;
     },
 
-    decode(data: string): SchemaToType<T> {
+    decode(data: Uint8Array): SchemaToType<T> {
       // deno-lint-ignore no-explicit-any
-      return data as any;
+      return new TextDecoder().decode(data) as any;
     },
 
-    encode(data: SchemaToType<T>): string {
+    encode(data: SchemaToType<T>): Uint8Array {
       // deno-lint-ignore no-explicit-any
-      return data as any;
+      return new TextEncoder().encode(data as any);
     },
   };
 }
