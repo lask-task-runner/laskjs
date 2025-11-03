@@ -136,60 +136,87 @@ export class Lask {
     await Deno.mkdir(".lask/history");
   }
 
-  async bite() {
-    const commands: Record<string, ReturnType<typeof cmd.command>> = {};
-    for (const taskName of Object.keys(this.tasks)) {
-      const task = this.tasks[taskName];
-      commands[taskName] = cmd.command({
-        name: taskName,
-        args: Object.keys(task.inputs).reduce((acc, key) => {
-          const input = task.inputs[key];
+  private buildCommandArgs(task: {
+    // deno-lint-ignore no-explicit-any
+    inputs: { [key: string]: Input<any> };
+  }): { [key: string]: ReturnType<typeof cmd.positional> | ReturnType<typeof cmd.option> } {
+    return Object.keys(task.inputs).reduce((acc, key) => {
+      const input = task.inputs[key];
 
-          if (input.kind === "param") {
-            acc[key] = cmd.positional({
-              type: input.type === "string" ? cmd.string : cmd.number,
-              description: input.description,
-            });
-          }
+      if (input.kind === "param") {
+        acc[key] = cmd.positional({
+          type: input.type === "string" ? cmd.string : cmd.number,
+          description: input.description,
+        });
+      }
 
-          if (input.kind === "option") {
-            acc[key] = cmd.option({
-              type: input.type === "string" ? cmd.string : cmd.number,
-              long: input.long,
-              short: input.short,
-              description: input.description,
-            });
-          }
+      if (input.kind === "option") {
+        acc[key] = cmd.option({
+          type: input.type === "string" ? cmd.string : cmd.number,
+          long: input.long,
+          short: input.short,
+          description: input.description,
+        });
+      }
 
-          return acc;
-          // deno-lint-ignore no-explicit-any
-        }, {} as { [key: string]: any }),
-        handler: async (args) => {
-          // deno-lint-ignore no-explicit-any
-          const inputs: { [key: string]: any } = {};
-          for (const key of Object.keys(task.inputs)) {
-            const input = task.inputs[key];
-            if (input.kind !== "custom") {
-              continue;
-            }
-            const { decoder, reader } = input;
-            const raw = await reader.read();
-            inputs[key] = await decoder.decode(raw);
-          }
+      return acc;
+      // deno-lint-ignore no-explicit-any
+    }, {} as { [key: string]: any });
+  }
 
-          console.log(`Inputs for task ${taskName}:`, { ...args, ...inputs });
-          const output = await task.func({ ...args, ...inputs });
-          Object.keys(task.outputs).forEach(async (key) => {
-            const { encoder, writer } = task.outputs[key];
-            const data = output[key];
-            const raw = encoder.encode(data);
-            await writer.write(raw);
-          });
-        },
-      });
+  private async processCustomInputs(task: {
+    // deno-lint-ignore no-explicit-any
+    inputs: { [key: string]: Input<any> };
+    // deno-lint-ignore no-explicit-any
+  }): Promise<{ [key: string]: any }> {
+    // deno-lint-ignore no-explicit-any
+    const inputs: { [key: string]: any } = {};
+    for (const key of Object.keys(task.inputs)) {
+      const input = task.inputs[key];
+      if (input.kind !== "custom") {
+        continue;
+      }
+      const { decoder, reader } = input;
+      const raw = await reader.read();
+      inputs[key] = await decoder.decode(raw);
     }
+    return inputs;
+  }
 
-    commands[":init"] = cmd.command({
+  private async processOutputs(
+    // deno-lint-ignore no-explicit-any
+    outputs: { [key: string]: Output<any> },
+    // deno-lint-ignore no-explicit-any
+    outputData: { [key: string]: any },
+  ): Promise<void> {
+    for (const key of Object.keys(outputs)) {
+      const { encoder, writer } = outputs[key];
+      const data = outputData[key];
+      const raw = encoder.encode(data);
+      await writer.write(raw);
+    }
+  }
+
+  private createTaskCommand(taskName: string): ReturnType<typeof cmd.command> {
+    const task = this.tasks[taskName];
+
+    return cmd.command({
+      name: taskName,
+      args: this.buildCommandArgs(task),
+      handler: async (args) => {
+        const customInputs = await this.processCustomInputs(task);
+        const allInputs = { ...args, ...customInputs };
+
+        console.log(`Inputs for task ${taskName}:`, allInputs);
+
+        const output = await task.func(allInputs);
+        await this.processOutputs(task.outputs, output);
+      },
+    });
+  }
+
+  private createInitCommand(): ReturnType<typeof cmd.command> {
+    return cmd.command({
       name: ":init",
       args: {},
       handler: async () => {
@@ -197,7 +224,22 @@ export class Lask {
         console.log("Initialized .lask directory.");
       },
     });
+  }
 
+  private buildCommands(): Record<string, ReturnType<typeof cmd.command>> {
+    const commands: Record<string, ReturnType<typeof cmd.command>> = {};
+
+    for (const taskName of Object.keys(this.tasks)) {
+      commands[taskName] = this.createTaskCommand(taskName);
+    }
+
+    commands[":init"] = this.createInitCommand();
+
+    return commands;
+  }
+
+  async bite() {
+    const commands = this.buildCommands();
     const lask = cmd.subcommands({
       name: "lask",
       cmds: commands,
