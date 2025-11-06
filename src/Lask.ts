@@ -197,6 +197,44 @@ export class Lask {
     }
   }
 
+  private async saveTaskHistory(
+    taskName: string,
+    // deno-lint-ignore no-explicit-any
+    inputs: { [key: string]: any },
+    // deno-lint-ignore no-explicit-any
+    outputs: { [key: string]: any },
+  ): Promise<void> {
+    const timestamp = new Date().toISOString();
+    const timestampForFile = timestamp.replace(/:/g, "-").replace(/\..+/, "");
+
+    // Encode inputs and outputs to base64
+    const encoder = new TextEncoder();
+    const inputsJson = JSON.stringify(inputs);
+    const outputsJson = JSON.stringify(outputs);
+    const inputsBase64 = btoa(String.fromCharCode(...encoder.encode(inputsJson)));
+    const outputsBase64 = btoa(String.fromCharCode(...encoder.encode(outputsJson)));
+
+    const historyRecord = {
+      timestamp,
+      taskName,
+      inputs: inputsBase64,
+      outputs: outputsBase64,
+    };
+
+    const historyDir = ".lask/history";
+    try {
+      await Deno.mkdir(historyDir, { recursive: true });
+    } catch (error) {
+      // Directory might already exist, ignore error
+      if (!(error instanceof Deno.errors.AlreadyExists)) {
+        throw error;
+      }
+    }
+
+    const filename = `${historyDir}/${timestampForFile}_${taskName}.json`;
+    await Deno.writeTextFile(filename, JSON.stringify(historyRecord, null, 2));
+  }
+
   private createTaskCommand(taskName: string): ReturnType<typeof cmd.command> {
     const task = this.tasks[taskName];
 
@@ -211,6 +249,9 @@ export class Lask {
 
         const output = await task.func(allInputs);
         await this.processOutputs(task.outputs, output);
+
+        // Save task execution history
+        await this.saveTaskHistory(taskName, allInputs, output);
       },
     });
   }
@@ -226,6 +267,47 @@ export class Lask {
     });
   }
 
+  private async listHistory(): Promise<void> {
+    const historyDir = ".lask/history";
+
+    try {
+      const entries = [];
+      for await (const entry of Deno.readDir(historyDir)) {
+        if (entry.isFile && entry.name.endsWith(".json")) {
+          entries.push(entry.name);
+        }
+      }
+
+      // Sort by filename (which includes timestamp)
+      entries.sort();
+
+      // Read and output each history file as JSONL
+      for (const filename of entries) {
+        const filePath = `${historyDir}/${filename}`;
+        const content = await Deno.readTextFile(filePath);
+        const record = JSON.parse(content);
+        // Output as single line JSON (JSONL format)
+        console.log(JSON.stringify(record));
+      }
+    } catch (error) {
+      if (error instanceof Deno.errors.NotFound) {
+        console.error("No history found. Run ':init' first or execute some tasks.");
+      } else {
+        throw error;
+      }
+    }
+  }
+
+  private createHistoryCommand(): ReturnType<typeof cmd.command> {
+    return cmd.command({
+      name: ":history",
+      args: {},
+      handler: async () => {
+        await this.listHistory();
+      },
+    });
+  }
+
   private buildCommands(): Record<string, ReturnType<typeof cmd.command>> {
     const commands: Record<string, ReturnType<typeof cmd.command>> = {};
 
@@ -234,6 +316,7 @@ export class Lask {
     }
 
     commands[":init"] = this.createInitCommand();
+    commands[":history"] = this.createHistoryCommand();
 
     return commands;
   }
