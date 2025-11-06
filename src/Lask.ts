@@ -267,7 +267,7 @@ export class Lask {
     });
   }
 
-  private async listHistory(): Promise<void> {
+  private async listHistory(taskFilter?: string): Promise<void> {
     const historyDir = ".lask/history";
 
     try {
@@ -286,6 +286,12 @@ export class Lask {
         const filePath = `${historyDir}/${filename}`;
         const content = await Deno.readTextFile(filePath);
         const record = JSON.parse(content);
+
+        // Filter by task name if specified
+        if (taskFilter && record.taskName !== taskFilter) {
+          continue;
+        }
+
         // Output as single line JSON (JSONL format)
         console.log(JSON.stringify(record));
       }
@@ -301,11 +307,17 @@ export class Lask {
   private createHistoryCommand(): ReturnType<typeof cmd.command> {
     return cmd.command({
       name: ":history",
-      args: {},
-      handler: async () => {
-        await this.listHistory();
+      args: {
+        task: cmd.option({
+          type: cmd.optional(cmd.string),
+          long: "task",
+          description: "Filter history by task name",
+        }),
       },
-    });
+      handler: async (args) => {
+        await this.listHistory(args.task);
+      },
+    }) as ReturnType<typeof cmd.command>;
   }
 
   private buildCommands(): Record<string, ReturnType<typeof cmd.command>> {
