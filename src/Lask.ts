@@ -82,6 +82,9 @@ export interface SchemaToType<T> {
 }
 
 export class Lask {
+  private static readonly LASK_DIR = ".lask";
+  private static readonly HISTORY_DIR = ".lask/history";
+
   private tasks: {
     [key: string]: {
       // deno-lint-ignore no-explicit-any
@@ -132,8 +135,8 @@ export class Lask {
   }
 
   private async init() {
-    await Deno.mkdir(".lask");
-    await Deno.mkdir(".lask/history");
+    await Deno.mkdir(Lask.LASK_DIR);
+    await Deno.mkdir(Lask.HISTORY_DIR);
   }
 
   private buildCommandArgs(task: {
@@ -221,9 +224,8 @@ export class Lask {
       outputs: outputsBase64,
     };
 
-    const historyDir = ".lask/history";
     try {
-      await Deno.mkdir(historyDir, { recursive: true });
+      await Deno.mkdir(Lask.HISTORY_DIR, { recursive: true });
     } catch (error) {
       // Directory might already exist, ignore error
       if (!(error instanceof Deno.errors.AlreadyExists)) {
@@ -231,7 +233,7 @@ export class Lask {
       }
     }
 
-    const filename = `${historyDir}/${timestampForFile}_${taskName}.json`;
+    const filename = `${Lask.HISTORY_DIR}/${timestampForFile}_${taskName}.json`;
     await Deno.writeTextFile(filename, JSON.stringify(historyRecord, null, 2));
   }
 
@@ -268,11 +270,9 @@ export class Lask {
   }
 
   private async listHistory(taskFilter?: string): Promise<void> {
-    const historyDir = ".lask/history";
-
     try {
       const entries = [];
-      for await (const entry of Deno.readDir(historyDir)) {
+      for await (const entry of Deno.readDir(Lask.HISTORY_DIR)) {
         if (entry.isFile && entry.name.endsWith(".json")) {
           entries.push(entry.name);
         }
@@ -283,7 +283,7 @@ export class Lask {
 
       // Read and output each history file as JSONL
       for (const filename of entries) {
-        const filePath = `${historyDir}/${filename}`;
+        const filePath = `${Lask.HISTORY_DIR}/${filename}`;
         const content = await Deno.readTextFile(filePath);
         const record = JSON.parse(content);
 
