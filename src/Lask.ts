@@ -101,31 +101,53 @@ export class Lask {
     IT extends keyof SchemaToType<IS>,
     OS,
     OT extends keyof SchemaToType<OS>,
-  >(
-    name: string,
-    inputs: { [key in keyof IS]: Input<IS[key]> },
-    outputs: { [key in keyof OS]: Output<OS[key]> },
+  >(config: {
+    name: string;
+    input: { [key in keyof IS]: Input<IS[key]> };
+    output: { [key in keyof OS]: Output<OS[key]> };
     handler: Handler<
-      { [key in keyof typeof inputs]: SchemaToType<IS[key]>[IT] },
+      { [key in keyof typeof config.input]: SchemaToType<IS[key]>[IT] },
       {
-        [key in keyof typeof outputs]: SchemaToType<OS[key]>[OT] extends never ? void
+        [key in keyof typeof config.output]: SchemaToType<OS[key]>[OT] extends never ? void
           : SchemaToType<OS[key]>[OT];
       }
-    >,
-  ): Func<
-    { [key in keyof typeof inputs]: SchemaToType<IS[key]>[IT] },
+    >;
+  }): Func<
+    { [key in keyof typeof config.input]: SchemaToType<IS[key]>[IT] },
     {
-      [key in keyof typeof outputs]: SchemaToType<OS[key]>[OT] extends never ? void
+      [key in keyof typeof config.output]: SchemaToType<OS[key]>[OT] extends never ? void
         : SchemaToType<OS[key]>[OT];
     }
-  > {
+  >;
+  task<IS, IT extends keyof SchemaToType<IS>>(config: {
+    name: string;
+    input: { [key in keyof IS]: Input<IS[key]> };
+    handler: Handler<
+      { [key in keyof typeof config.input]: SchemaToType<IS[key]>[IT] },
+      Record<PropertyKey, never>
+    >;
+  }): Func<
+    { [key in keyof typeof config.input]: SchemaToType<IS[key]>[IT] },
+    Record<PropertyKey, never>
+  >;
+  task(config: {
+    name: string;
+    handler: Handler<Record<PropertyKey, never>, Record<PropertyKey, never>>;
+  }): Func<Record<PropertyKey, never>, Record<PropertyKey, never>>;
+  task(config: {
+    name: string;
+    // deno-lint-ignore no-explicit-any
+    input?: { [key: string]: Input<any> };
+    // deno-lint-ignore no-explicit-any
+    output?: { [key: string]: Output<any> };
+    // deno-lint-ignore no-explicit-any
+    handler: Handler<any, any>;
+    // deno-lint-ignore no-explicit-any
+  }): Func<any, any> {
+    const { name, input: inputs = {}, output: outputs = {}, handler } = config;
     const effect = new Effect(`Task#${name}`);
-    const func = (input: { [key in keyof typeof inputs]: SchemaToType<IS[key]>[IT] }): Promise<
-      {
-        [key in keyof typeof outputs]: SchemaToType<OS[key]>[OT] extends never ? void
-          : SchemaToType<OS[key]>[OT];
-      }
-    > => handler(input, effect);
+    // deno-lint-ignore no-explicit-any
+    const func = (input: any): Promise<any> => handler(input, effect);
     this.tasks[name] = {
       func,
       inputs,
