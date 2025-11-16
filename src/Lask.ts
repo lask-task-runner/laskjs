@@ -101,50 +101,61 @@ export class Lask {
     IT extends keyof SchemaToType<IS>,
     OS,
     OT extends keyof SchemaToType<OS>,
-  >(config: {
-    name: string;
-    input: { [key in keyof IS]: Input<IS[key]> };
-    output: { [key in keyof OS]: Output<OS[key]> };
-    handler: Handler<
-      { [key in keyof typeof config.input]: SchemaToType<IS[key]>[IT] },
-      {
-        [key in keyof typeof config.output]: SchemaToType<OS[key]>[OT] extends never ? void
-          : SchemaToType<OS[key]>[OT];
-      }
-    >;
-  }): Func<
+  >(
+    name: string,
+    config: {
+      input: { [key in keyof IS]: Input<IS[key]> };
+      output: { [key in keyof OS]: Output<OS[key]> };
+      handler: Handler<
+        { [key in keyof typeof config.input]: SchemaToType<IS[key]>[IT] },
+        {
+          [key in keyof typeof config.output]: SchemaToType<OS[key]>[OT] extends never ? void
+            : SchemaToType<OS[key]>[OT];
+        }
+      >;
+    },
+  ): Func<
     { [key in keyof typeof config.input]: SchemaToType<IS[key]>[IT] },
     {
       [key in keyof typeof config.output]: SchemaToType<OS[key]>[OT] extends never ? void
         : SchemaToType<OS[key]>[OT];
     }
   >;
-  task<IS, IT extends keyof SchemaToType<IS>>(config: {
-    name: string;
-    input: { [key in keyof IS]: Input<IS[key]> };
-    handler: Handler<
-      { [key in keyof typeof config.input]: SchemaToType<IS[key]>[IT] },
-      Record<PropertyKey, never>
-    >;
-  }): Func<
+  task<IS, IT extends keyof SchemaToType<IS>>(
+    name: string,
+    config: {
+      input: { [key in keyof IS]: Input<IS[key]> };
+      handler: Handler<
+        { [key in keyof typeof config.input]: SchemaToType<IS[key]>[IT] },
+        Record<PropertyKey, never>
+      >;
+    },
+  ): Func<
     { [key in keyof typeof config.input]: SchemaToType<IS[key]>[IT] },
     Record<PropertyKey, never>
   >;
-  task(config: {
-    name: string;
-    handler: Handler<Record<PropertyKey, never>, Record<PropertyKey, never>>;
-  }): Func<Record<PropertyKey, never>, Record<PropertyKey, never>>;
-  task(config: {
-    name: string;
+  task(
+    name: string,
+    config: {
+      handler: Handler<Record<PropertyKey, never>, Record<PropertyKey, never>>;
+    },
+  ): Func<Record<PropertyKey, never>, Record<PropertyKey, never>>;
+  task(
+    name: string,
+    config: {
+      // deno-lint-ignore no-explicit-any
+      input?: { [key: string]: Input<any> };
+      // deno-lint-ignore no-explicit-any
+      output?: { [key: string]: Output<any> };
+      // deno-lint-ignore no-explicit-any
+      handler: Handler<any, any>;
+    },
     // deno-lint-ignore no-explicit-any
-    input?: { [key: string]: Input<any> };
-    // deno-lint-ignore no-explicit-any
-    output?: { [key: string]: Output<any> };
-    // deno-lint-ignore no-explicit-any
-    handler: Handler<any, any>;
-    // deno-lint-ignore no-explicit-any
-  }): Func<any, any> {
-    const { name, input: inputs = {}, output: outputs = {}, handler } = config;
+  ): Func<any, any> {
+    const inputs = config.input || {};
+    const outputs = config.output || {};
+    const { handler } = config;
+
     const effect = new Effect(`Task#${name}`);
     // deno-lint-ignore no-explicit-any
     const func = (input: any): Promise<any> => handler(input, effect);

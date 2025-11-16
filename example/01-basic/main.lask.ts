@@ -6,8 +6,7 @@ import { input, Lask, option, output } from "../../src/Lask.ts";
 
 const lask = new Lask();
 
-lask.task({
-  name: "write-file",
+lask.task("write-file", {
   input: {
     content: input(stdin, string("Input content to write to file")),
   },
@@ -20,8 +19,7 @@ lask.task({
   },
 });
 
-lask.task({
-  name: "add",
+lask.task("add", {
   input: {
     a: option({ type: "number", long: "a", short: "a" }),
     b: option({ type: "number", long: "b", short: "b" }),
@@ -35,8 +33,7 @@ lask.task({
   },
 });
 
-lask.task({
-  name: "ls",
+lask.task("ls", {
   handler: async (_inputs, effect) => {
     effect.info("Listing current directory contents");
     await effect.$("ls -la");
