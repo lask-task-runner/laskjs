@@ -1,14 +1,32 @@
 import * as cmd from "npm:cmd-ts";
 import { Effect } from "./Effect.ts";
 
-export interface Decoder<T> {
+export type JSONSchema =
+  | { type: "null"; description?: string }
+  | { type: "boolean"; description?: string }
+  | { type: "number"; description?: string }
+  | { type: "string"; description?: string }
+  | { type: "array"; elements: JSONSchema; description?: string }
+  | { type: "object"; properties: { [key: string]: JSONSchema }; description?: string };
+
+export type JSONType<T extends JSONSchema> = T extends { type: "null" } ? null
+  : T extends { type: "boolean" } ? boolean
+  : T extends { type: "number" } ? number
+  : T extends { type: "string" } ? string
+  : T extends { type: "array"; elements: infer E } ? E extends JSONSchema ? JSONType<E>[] : never
+  : T extends { type: "object"; properties: infer P }
+    ? P extends { [key: string]: JSONSchema } ? { [K in keyof P]: JSONType<P[K]> }
+    : never
+  : never;
+
+export interface Decoder<T extends JSONSchema> {
   schema(): T;
-  decode(raw: Uint8Array): SchemaToType<T>;
+  decode(raw: Uint8Array): JSONType<T>;
 }
 
-export interface Encoder<T> {
+export interface Encoder<T extends JSONSchema> {
   schema(): T;
-  encode(data: SchemaToType<T>): Uint8Array;
+  encode(data: JSONType<T>): Uint8Array;
 }
 
 export interface Reader {
@@ -19,13 +37,13 @@ export interface Writer {
   write(raw: Uint8Array): Promise<void>;
 }
 
-export type Input<T> = {
+export type InputSource<T extends JSONSchema> = {
   kind: "param";
-  type: "string" | "number";
+  schema: T;
   description?: string;
 } | {
   kind: "option";
-  type: "string" | "number";
+  schema: T;
   long: string;
   short?: string;
   description?: string;
@@ -35,51 +53,41 @@ export type Input<T> = {
   reader: Reader;
 };
 
-export interface Output<T> {
-  encoder: Encoder<T>;
-  writer: Writer;
+export type InputSchema = JSONSchema & {
+  from?: InputSource<JSONSchema>;
+};
+
+export type OutputSchema = JSONSchema & {
+  to?: Writer;
+};
+
+export function param<T extends JSONSchema>(
+  schema: T,
+  options?: { description?: string },
+): InputSource<T> {
+  return { kind: "param", schema, description: options?.description };
 }
 
-export function param<T extends ParamSchema>(
-  param: { type: T; description?: string },
-): Input<T> {
-  return { kind: "param", ...param };
+export function option<T extends JSONSchema>(
+  schema: T,
+  options: { long: string; short?: string; description?: string },
+): InputSource<T> {
+  return {
+    kind: "option",
+    schema,
+    long: options.long,
+    short: options.short,
+    description: options.description,
+  };
 }
 
-export function option<T extends OptionSchema>(
-  option: { type: T; long: string; short?: string; description?: string },
-): Input<T> {
-  return { kind: "option", ...option };
-}
-
-export type ParamSchema = "string" | "number";
-
-export type OptionSchema = "string" | "number";
-
-export type ParamType<T extends ParamSchema> = T extends "string" ? string
-  : T extends "number" ? number
-  : never;
-
-export type OptionType<T extends OptionSchema> = T extends "string" ? string
-  : T extends "number" ? number
-  : never;
-
-export function input<T>(reader: Reader, decoder: Decoder<T>): Input<T> {
+export function input<T extends JSONSchema>(reader: Reader, decoder: Decoder<T>): InputSource<T> {
   return { kind: "custom", decoder, reader };
-}
-
-export function output<T>(writer: Writer, encoder: Encoder<T>): Output<T> {
-  return { encoder, writer };
 }
 
 export type Handler<I, O> = (input: I, effect: Effect) => Promise<O>;
 
 export type Func<I, O> = (input: I) => Promise<O>;
-
-export interface SchemaToType<T> {
-  ParamSchema: T extends ParamSchema ? ParamType<T> : never;
-  OptionSchema: T extends OptionSchema ? OptionType<T> : never;
-}
 
 export class Lask {
   private static readonly LASK_DIR = ".lask";
@@ -89,51 +97,26 @@ export class Lask {
     [key: string]: {
       // deno-lint-ignore no-explicit-any
       func: Func<any, any>;
-      // deno-lint-ignore no-explicit-any
-      inputs: { [key: string]: Input<any> };
-      // deno-lint-ignore no-explicit-any
-      outputs: { [key: string]: Output<any> };
+      inputSchema?: InputSchema;
+      outputSchema?: OutputSchema;
     };
   } = {};
 
-  task<
-    IS,
-    IT extends keyof SchemaToType<IS>,
-    OS,
-    OT extends keyof SchemaToType<OS>,
-  >(
+  task<I extends InputSchema, O extends OutputSchema>(
     name: string,
     config: {
-      input: { [key in keyof IS]: Input<IS[key]> };
-      output: { [key in keyof OS]: Output<OS[key]> };
-      handler: Handler<
-        { [key in keyof typeof config.input]: SchemaToType<IS[key]>[IT] },
-        {
-          [key in keyof typeof config.output]: SchemaToType<OS[key]>[OT] extends never ? void
-            : SchemaToType<OS[key]>[OT];
-        }
-      >;
+      input: I;
+      output: O;
+      handler: Handler<JSONType<I>, JSONType<O>>;
     },
-  ): Func<
-    { [key in keyof typeof config.input]: SchemaToType<IS[key]>[IT] },
-    {
-      [key in keyof typeof config.output]: SchemaToType<OS[key]>[OT] extends never ? void
-        : SchemaToType<OS[key]>[OT];
-    }
-  >;
-  task<IS, IT extends keyof SchemaToType<IS>>(
+  ): Func<JSONType<I>, JSONType<O>>;
+  task<I extends InputSchema>(
     name: string,
     config: {
-      input: { [key in keyof IS]: Input<IS[key]> };
-      handler: Handler<
-        { [key in keyof typeof config.input]: SchemaToType<IS[key]>[IT] },
-        Record<PropertyKey, never>
-      >;
+      input: I;
+      handler: Handler<JSONType<I>, Record<PropertyKey, never>>;
     },
-  ): Func<
-    { [key in keyof typeof config.input]: SchemaToType<IS[key]>[IT] },
-    Record<PropertyKey, never>
-  >;
+  ): Func<JSONType<I>, Record<PropertyKey, never>>;
   task(
     name: string,
     config: {
@@ -143,26 +126,22 @@ export class Lask {
   task(
     name: string,
     config: {
-      // deno-lint-ignore no-explicit-any
-      input?: { [key: string]: Input<any> };
-      // deno-lint-ignore no-explicit-any
-      output?: { [key: string]: Output<any> };
+      input?: InputSchema;
+      output?: OutputSchema;
       // deno-lint-ignore no-explicit-any
       handler: Handler<any, any>;
     },
     // deno-lint-ignore no-explicit-any
   ): Func<any, any> {
-    const inputs = config.input || {};
-    const outputs = config.output || {};
-    const { handler } = config;
+    const { input: inputSchema, output: outputSchema, handler } = config;
 
     const effect = new Effect(`Task#${name}`);
     // deno-lint-ignore no-explicit-any
     const func = (input: any): Promise<any> => handler(input, effect);
     this.tasks[name] = {
       func,
-      inputs,
-      outputs,
+      inputSchema,
+      outputSchema,
     };
     return func;
   }
@@ -172,47 +151,64 @@ export class Lask {
     await Deno.mkdir(Lask.HISTORY_DIR);
   }
 
-  private buildCommandArgs(task: {
+  // deno-lint-ignore no-explicit-any
+  private buildCommandArgs(inputSchema?: InputSchema): { [key: string]: any } {
+    if (!inputSchema || inputSchema.type !== "object") {
+      return {};
+    }
+
     // deno-lint-ignore no-explicit-any
-    inputs: { [key: string]: Input<any> };
-  }): { [key: string]: ReturnType<typeof cmd.positional> | ReturnType<typeof cmd.option> } {
-    return Object.keys(task.inputs).reduce((acc, key) => {
-      const input = task.inputs[key];
+    const args: { [key: string]: any } = {};
 
-      if (input.kind === "param") {
-        acc[key] = cmd.positional({
-          type: input.type === "string" ? cmd.string : cmd.number,
-          description: input.description,
+    for (const [key, propSchema] of Object.entries(inputSchema.properties)) {
+      const from = (propSchema as InputSchema).from;
+      if (!from) continue;
+
+      if (from.kind === "param") {
+        const cmdType = this.schemaToCmdType(from.schema);
+        args[key] = cmd.positional({
+          type: cmdType,
+          description: from.description,
+        });
+      } else if (from.kind === "option") {
+        const cmdType = this.schemaToCmdType(from.schema);
+        args[key] = cmd.option({
+          type: cmdType,
+          long: from.long,
+          short: from.short,
+          description: from.description,
         });
       }
+    }
 
-      if (input.kind === "option") {
-        acc[key] = cmd.option({
-          type: input.type === "string" ? cmd.string : cmd.number,
-          long: input.long,
-          short: input.short,
-          description: input.description,
-        });
-      }
-
-      return acc;
-      // deno-lint-ignore no-explicit-any
-    }, {} as { [key: string]: any });
+    return args;
   }
 
-  private async processCustomInputs(task: {
-    // deno-lint-ignore no-explicit-any
-    inputs: { [key: string]: Input<any> };
-    // deno-lint-ignore no-explicit-any
-  }): Promise<{ [key: string]: any }> {
+  private schemaToCmdType(schema: JSONSchema): typeof cmd.string | typeof cmd.number {
+    if (schema.type === "string") {
+      return cmd.string;
+    } else if (schema.type === "number") {
+      return cmd.number;
+    }
+    // Default to string for complex types
+    return cmd.string;
+  }
+
+  // deno-lint-ignore no-explicit-any
+  private async processCustomInputs(inputSchema?: InputSchema): Promise<{ [key: string]: any }> {
     // deno-lint-ignore no-explicit-any
     const inputs: { [key: string]: any } = {};
-    for (const key of Object.keys(task.inputs)) {
-      const input = task.inputs[key];
-      if (input.kind !== "custom") {
+
+    if (!inputSchema || inputSchema.type !== "object") {
+      return inputs;
+    }
+
+    for (const [key, propSchema] of Object.entries(inputSchema.properties)) {
+      const from = (propSchema as InputSchema).from;
+      if (!from || from.kind !== "custom") {
         continue;
       }
-      const { decoder, reader } = input;
+      const { decoder, reader } = from;
       const raw = await reader.read();
       inputs[key] = await decoder.decode(raw);
     }
@@ -220,41 +216,34 @@ export class Lask {
   }
 
   private async processOutputs(
+    outputSchema: OutputSchema | undefined,
     // deno-lint-ignore no-explicit-any
-    outputs: { [key: string]: Output<any> },
-    // deno-lint-ignore no-explicit-any
-    outputData: { [key: string]: any },
+    outputData: any,
+    encoder: Encoder<JSONSchema>,
   ): Promise<void> {
-    for (const key of Object.keys(outputs)) {
-      const { encoder, writer } = outputs[key];
-      const data = outputData[key];
-      const raw = encoder.encode(data);
-      await writer.write(raw);
+    if (!outputSchema || !outputSchema.to) {
+      return;
     }
+
+    const raw = encoder.encode(outputData);
+    await outputSchema.to.write(raw);
   }
 
   private async saveTaskHistory(
     taskName: string,
     // deno-lint-ignore no-explicit-any
-    inputs: { [key: string]: any },
+    input: { [key: string]: any },
     // deno-lint-ignore no-explicit-any
-    outputs: { [key: string]: any },
+    output: { [key: string]: any },
   ): Promise<void> {
     const timestamp = new Date().toISOString();
     const timestampForFile = timestamp.replace(/:/g, "-").replace(/\..+/, "");
 
-    // Encode inputs and outputs to base64
-    const encoder = new TextEncoder();
-    const inputsJson = JSON.stringify(inputs);
-    const outputsJson = JSON.stringify(outputs);
-    const inputsBase64 = btoa(String.fromCharCode(...encoder.encode(inputsJson)));
-    const outputsBase64 = btoa(String.fromCharCode(...encoder.encode(outputsJson)));
-
     const historyRecord = {
       timestamp,
       taskName,
-      inputs: inputsBase64,
-      outputs: outputsBase64,
+      input,
+      output,
     };
 
     try {
@@ -275,15 +264,22 @@ export class Lask {
 
     return cmd.command({
       name: taskName,
-      args: this.buildCommandArgs(task),
+      args: this.buildCommandArgs(task.inputSchema),
       handler: async (args) => {
-        const customInputs = await this.processCustomInputs(task);
+        const customInputs = await this.processCustomInputs(task.inputSchema);
         const allInputs = { ...args, ...customInputs };
 
         console.log(`Inputs for task ${taskName}:`, allInputs);
 
         const output = await task.func(allInputs);
-        await this.processOutputs(task.outputs, output);
+
+        // Process output if outputSchema has 'to' writer
+        if (task.outputSchema && task.outputSchema.to) {
+          // Create encoder from outputSchema
+          const { json } = await import("./Codec/JSON.ts");
+          const encoder = json(task.outputSchema);
+          await this.processOutputs(task.outputSchema, output, encoder);
+        }
 
         // Save task execution history
         await this.saveTaskHistory(taskName, allInputs, output);

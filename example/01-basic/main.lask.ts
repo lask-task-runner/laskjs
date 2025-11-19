@@ -1,35 +1,42 @@
-import { json } from "../../src/Codec/JSON.ts";
 import { string } from "../../src/Codec/String.ts";
 import { stdin, stdout } from "../../src/IO/Console.ts";
 import { file } from "../../src/IO/File.ts";
-import { input, Lask, option, output } from "../../src/Lask.ts";
+import { input, Lask, option } from "../../src/Lask.ts";
 
 const lask = new Lask();
 
 lask.task("write-file", {
   input: {
-    content: input(stdin, string("Input content to write to file")),
+    type: "object",
+    properties: {
+      content: { type: "string", from: input(stdin, string("Input content to write to file")) },
+    },
   },
   output: {
-    file: output(file("output.txt"), string("Output file content")),
+    type: "string",
+    to: file("output.txt"),
   },
   handler: ({ content }, effect) => {
     effect.info(`With content: ${content}`);
-    return Promise.resolve({ file: content });
+    return Promise.resolve(content);
   },
 });
 
 lask.task("add", {
   input: {
-    a: option({ type: "number", long: "a", short: "a" }),
-    b: option({ type: "number", long: "b", short: "b" }),
+    type: "object",
+    properties: {
+      a: { type: "number", from: option({ type: "number" }, { long: "a", short: "a" }) },
+      b: { type: "number", from: option({ type: "number" }, { long: "b", short: "b" }) },
+    },
   },
   output: {
-    output: output(stdout, json({ type: "number" })),
+    type: "number",
+    to: stdout,
   },
   handler: ({ a, b }, effect) => {
     effect.info(`Adding two numbers: ${a} ${b}`);
-    return Promise.resolve({ output: a + b });
+    return Promise.resolve(a + b);
   },
 });
 

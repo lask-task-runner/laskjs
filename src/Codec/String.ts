@@ -1,29 +1,22 @@
-import { Decoder, Encoder, SchemaToType } from "../Lask.ts";
+import { Decoder, Encoder, JSONType } from "../Lask.ts";
 
-export type StringSchema = { type: "string"; description?: string };
-
-export type StringType<T extends StringSchema> = T extends { type: "string" } ? string : never;
-
-export function string<T extends StringSchema>(description?: string): Decoder<T> & Encoder<T> {
+export function string(
+  description?: string,
+):
+  & Decoder<{ type: "string"; description?: string }>
+  & Encoder<{ type: "string"; description?: string }> {
+  const schema = { type: "string" as const, description };
   return {
-    schema(): T {
-      return { type: "string", description } as T;
+    schema() {
+      return schema;
     },
 
-    decode(data: Uint8Array): SchemaToType<T> {
-      // deno-lint-ignore no-explicit-any
-      return new TextDecoder().decode(data) as any;
+    decode(data: Uint8Array): JSONType<typeof schema> {
+      return new TextDecoder().decode(data);
     },
 
-    encode(data: SchemaToType<T>): Uint8Array {
-      // deno-lint-ignore no-explicit-any
-      return new TextEncoder().encode(data as any);
+    encode(data: JSONType<typeof schema>): Uint8Array {
+      return new TextEncoder().encode(data);
     },
   };
-}
-
-declare module "../Lask.ts" {
-  interface SchemaToType<T> {
-    StringSchema: T extends StringSchema ? StringType<T> : never;
-  }
 }
