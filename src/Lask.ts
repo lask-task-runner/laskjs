@@ -105,34 +105,11 @@ export class Lask {
   task<I extends InputSchema, O extends OutputSchema>(
     name: string,
     config: {
-      input: I;
-      output: O;
-      handler: Handler<JSONType<I>, JSONType<O>>;
+      input?: I;
+      output?: O;
+      handler: Handler<JSONType<I extends undefined ? void : I>, JSONType<O>>;
     },
-  ): Func<JSONType<I>, JSONType<O>>;
-  task<I extends InputSchema>(
-    name: string,
-    config: {
-      input: I;
-      handler: Handler<JSONType<I>, Record<PropertyKey, never>>;
-    },
-  ): Func<JSONType<I>, Record<PropertyKey, never>>;
-  task(
-    name: string,
-    config: {
-      handler: Handler<Record<PropertyKey, never>, Record<PropertyKey, never>>;
-    },
-  ): Func<Record<PropertyKey, never>, Record<PropertyKey, never>>;
-  task(
-    name: string,
-    config: {
-      input?: InputSchema;
-      output?: OutputSchema;
-      // deno-lint-ignore no-explicit-any
-      handler: Handler<any, any>;
-    },
-    // deno-lint-ignore no-explicit-any
-  ): Func<any, any> {
+  ): Func<JSONType<I>, JSONType<O>> {
     const { input: inputSchema, output: outputSchema, handler } = config;
 
     const effect = new Effect(`Task#${name}`);
