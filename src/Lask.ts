@@ -1,4 +1,4 @@
-import * as cmd from "npm:cmd-ts";
+import * as cmd from "npm:cmd-ts@0.14.3";
 import { Effect } from "./Effect.ts";
 
 export type JSONSchema =

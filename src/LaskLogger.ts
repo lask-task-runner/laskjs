@@ -1,4 +1,4 @@
-import winston from "npm:winston";
+import winston from "npm:winston@3.18.3";
 
 export class LaskLogger {
   private logger: winston.Logger;

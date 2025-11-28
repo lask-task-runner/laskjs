@@ -1,4 +1,4 @@
-import { readAll } from "jsr:@std/io/read-all";
+import { readAll } from "jsr:@std/io@0.225.2/read-all";
 import { Reader } from "../Lask.ts";
 
 export const stdin: Reader = {
