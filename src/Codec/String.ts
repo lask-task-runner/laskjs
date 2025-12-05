@@ -1,22 +1,18 @@
 import { Decoder, Encoder, JSONType } from "../Lask.ts";
 
-export function string(
-  description?: string,
-):
-  & Decoder<{ type: "string"; description?: string }>
-  & Encoder<{ type: "string"; description?: string }> {
-  const schema = { type: "string" as const, description };
-  return {
-    schema() {
-      return schema;
-    },
+export const raw: Decoder<string> & Encoder<string> = {
+  decode(data: Uint8Array): Promise<string> {
+    return Promise.resolve(new TextDecoder().decode(data));
+  },
+  encode(data: string): Promise<Uint8Array> {
+    return Promise.resolve(new TextEncoder().encode(data));
+  },
+};
 
-    decode(data: Uint8Array): JSONType<typeof schema> {
-      return new TextDecoder().decode(data);
-    },
-
-    encode(data: JSONType<typeof schema>): Uint8Array {
-      return new TextEncoder().encode(data);
-    },
-  };
-}
+export const stringify: Encoder<JSONType> = {
+  encode(data: JSONType): Promise<Uint8Array> {
+    return Promise.resolve(
+      new TextEncoder().encode(JSON.stringify(data, null, 2)),
+    );
+  },
+};

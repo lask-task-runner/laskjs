@@ -1,17 +1,13 @@
-import { Decoder, Encoder, JSONSchema, JSONType } from "../Lask.ts";
+import { Decoder, Encoder, JSONSchema } from "../Lask.ts";
 
-export function json<T extends JSONSchema>(schema: T): Decoder<T> & Encoder<T> {
+export function json<T extends JSONSchema>(): Decoder<T> & Encoder<T> {
   return {
-    schema(): T {
-      return schema;
+    decode(raw: Uint8Array): T {
+      return JSON.parse(new TextDecoder().decode(raw)) as T;
     },
 
-    decode(data: Uint8Array): JSONType<T> {
-      return JSON.parse(new TextDecoder().decode(data));
-    },
-
-    encode(data: JSONType<T>): Uint8Array {
-      return new TextEncoder().encode(JSON.stringify(data, null, 2));
+    encode(raw: T): Uint8Array {
+      return new TextEncoder().encode(JSON.stringify(raw, null, 2));
     },
   };
 }

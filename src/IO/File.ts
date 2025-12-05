@@ -5,8 +5,8 @@ export const file = (path: string): Reader & Writer => {
     write: async (data: Uint8Array): Promise<void> => {
       await Deno.writeFile(path, data);
     },
-    read: async (): Promise<Uint8Array> => {
-      return await Deno.readFile(path);
+    read: (): Promise<Uint8Array> => {
+      return Deno.readFile(path);
     },
   };
 };
