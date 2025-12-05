@@ -69,9 +69,42 @@ export type OutputSchema<T extends JSONSchema = JSONSchema> = T extends
   : never
   : T & { to?: Target<SchemaToJSONType<T>> };
 
-export type Handler<I, O> = (input: I, effect: Effect) => Promise<O> | O;
+export type ResourceSchema<
+  T extends JSONSchema = {
+    type: "object";
+    properties: { id: ResourceId; [key: string]: JSONSchema };
+    description?: string;
+  },
+> = T extends { type: "object"; properties: infer P } ? P extends { [key: string]: JSONSchema } ?
+      & T
+      & { from?: Source<SchemaToJSONType<T>> }
+      & {
+        properties: {
+          [K in keyof P]: InputSchema<P[K]>;
+        };
+      }
+  : never
+  : T & { from?: Source<SchemaToJSONType<T>> };
 
-export type Func<I, O> = (input: I) => Promise<O> | O;
+export type ResourceId = { type: "string"; description?: string };
+
+export type TaskHandler<I, O> = (input: I, effect: Effect) => Promise<O> | O;
+
+export type ResourceHandler<R> = {
+  create: (resource: R, effect: Effect) => Promise<R> | R;
+  read: (id: SchemaToJSONType<ResourceId>, effect: Effect) => Promise<R> | R;
+  update?: (resource: R, previous: R, effect: Effect) => Promise<R> | R;
+  delete: (id: SchemaToJSONType<ResourceId>, resource: R, effect: Effect) => Promise<void> | void;
+};
+
+export type TaskFunc<I, O> = (input: I) => Promise<O> | O;
+
+export type ResourceFunc<R> = {
+  create: (resource: R) => Promise<R> | R;
+  read: (id: SchemaToJSONType<ResourceId>) => Promise<R> | R;
+  update?: (resource: R, previous: R) => Promise<R> | R;
+  delete: (id: SchemaToJSONType<ResourceId>, resource: R) => Promise<void> | void;
+};
 
 export class Lask {
   private static readonly LASK_DIR = ".lask";
@@ -80,9 +113,17 @@ export class Lask {
   private tasks: {
     [key: string]: {
       // deno-lint-ignore no-explicit-any
-      func: Func<any, any>;
+      func: TaskFunc<any, any>;
       inputSchema?: InputSchema<JSONSchema>;
       outputSchema?: OutputSchema<JSONSchema>;
+    };
+  } = {};
+
+  private resources: {
+    [key: string]: {
+      schema: ResourceSchema;
+      // deno-lint-ignore no-explicit-any
+      func: ResourceFunc<any>;
     };
   } = {};
 
@@ -91,9 +132,9 @@ export class Lask {
     config: {
       input?: InputSchema<I>;
       output?: OutputSchema<O>;
-      handler: Handler<SchemaToJSONType<I extends undefined ? void : I>, SchemaToJSONType<O>>;
+      handler: TaskHandler<SchemaToJSONType<I extends undefined ? void : I>, SchemaToJSONType<O>>;
     },
-  ): Func<SchemaToJSONType<I>, SchemaToJSONType<O>> {
+  ): TaskFunc<SchemaToJSONType<I>, SchemaToJSONType<O>> {
     const { input: inputSchema, output: outputSchema, handler } = config;
 
     const effect = new Effect(`Task#${name}`);
@@ -104,6 +145,27 @@ export class Lask {
       inputSchema,
       outputSchema,
     };
+    return func;
+  }
+
+  resource<R extends ResourceSchema>(
+    name: string,
+    config: { resource: R } & ResourceHandler<SchemaToJSONType<R>>,
+  ): ResourceFunc<SchemaToJSONType<R>> {
+    const { resource: schema } = config;
+    const func = {
+      create: (resource: SchemaToJSONType<R>) =>
+        config.create(resource, new Effect(`Resource#${name}#create`)),
+      read: (id: SchemaToJSONType<ResourceId>) =>
+        config.read(id, new Effect(`Resource#${name}#read`)),
+      update: config.update
+        ? (resource: SchemaToJSONType<R>, previous: SchemaToJSONType<R>) =>
+          config.update!(resource, previous, new Effect(`Resource#${name}#update`))
+        : undefined,
+      delete: (id: SchemaToJSONType<ResourceId>, resource: SchemaToJSONType<R>) =>
+        config.delete(id, resource, new Effect(`Resource#${name}#delete`)),
+    };
+    this.resources[name] = { schema, func };
     return func;
   }
 
@@ -162,8 +224,7 @@ export class Lask {
     }
   }
 
-  async bite() {
-    const taskName = Deno.args[0];
+  async runTask(taskName: string) {
     const task = this.tasks[taskName];
 
     if (!task) {
@@ -177,6 +238,117 @@ export class Lask {
     const output = await func(input);
     if (outputSchema) {
       await this.writeOutput(outputSchema, output);
+    }
+  }
+
+  async createResource(resourceName: string) {
+    const resource = this.resources[resourceName];
+
+    if (!resource) {
+      console.error(`Resource "${resourceName}" not found.`);
+      Deno.exit(1);
+    }
+
+    const { schema, func } = resource;
+
+    const input = await this.readInput(schema);
+    const createdResource = await func.create(input as never);
+    console.log("Resource created:", createdResource);
+  }
+
+  async readResource(resourceName: string) {
+    const resource = this.resources[resourceName];
+
+    if (!resource) {
+      console.error(`Resource "${resourceName}" not found.`);
+      Deno.exit(1);
+    }
+
+    const { schema, func } = resource;
+
+    const input = await this.readInput(schema.properties.id);
+    const readResource = await func.read(input as never);
+    console.log("Resource read:", readResource);
+  }
+
+  async updateResource(resourceName: string) {
+    const resource = this.resources[resourceName];
+
+    if (!resource) {
+      console.error(`Resource "${resourceName}" not found.`);
+      Deno.exit(1);
+    }
+
+    const { schema, func } = resource;
+
+    if (func.update) {
+      const input = await this.readInput(schema);
+      const previousInput = await this.readInput(schema);
+      const updatedResource = await func.update!(
+        input as never,
+        previousInput as never,
+      );
+      console.log("Resource updated:", updatedResource);
+    } else {
+      // delete and recreate
+      const input = await this.readInput(schema);
+      await func.delete(
+        (input as { id: string }).id as never,
+        input as never,
+      );
+      const createdResource = await func.create(input as never);
+      console.log("Resource updated via delete and recreate:", createdResource);
+    }
+  }
+
+  async deleteResource(resourceName: string) {
+    const resource = this.resources[resourceName];
+
+    if (!resource) {
+      console.error(`Resource "${resourceName}" not found.`);
+      Deno.exit(1);
+    }
+
+    const { schema, func } = resource;
+
+    const input = await this.readInput(schema);
+    await func.delete(
+      (input as { id: string }).id as never,
+      input as never,
+    );
+    console.log("Resource deleted:", (input as { id: string }).id);
+  }
+
+  async bite() {
+    const commandName = Deno.args[0];
+    switch (commandName) {
+      case "run": {
+        const taskName = Deno.args[1];
+        await this.runTask(taskName);
+        break;
+      }
+      case "create": {
+        const resourceName = Deno.args[1];
+        await this.createResource(resourceName);
+        break;
+      }
+      case "read": {
+        const resourceName = Deno.args[1];
+        await this.readResource(resourceName);
+        break;
+      }
+      case "update": {
+        const resourceName = Deno.args[1];
+        await this.updateResource(resourceName);
+        break;
+      }
+      case "delete": {
+        const resourceName = Deno.args[1];
+        await this.deleteResource(resourceName);
+        break;
+      }
+      default:
+        break;
     }
   }
 }

@@ -1,30 +1,54 @@
 import { json } from "../../src/Codec/JSON.ts";
 import { raw, stringify } from "../../src/Codec/String.ts";
 import { arg } from "../../src/IO/Command.ts";
-import { stdin, stdout } from "../../src/IO/Console.ts";
-import { file } from "../../src/IO/File.ts";
+import { stdout } from "../../src/IO/Console.ts";
 import { Lask } from "../../src/Lask.ts";
 
 const lask = new Lask();
 
-lask.task("write-file", {
-  input: {
-    type: "string",
-    from: {
-      decoder: raw,
-      reader: stdin,
+lask.resource("file", {
+  resource: {
+    type: "object",
+    properties: {
+      id: {
+        type: "string",
+        description: "The path to the file",
+        from: {
+          reader: arg(0),
+          decoder: raw,
+        },
+      },
+      contents: {
+        type: "string",
+        description: "The contents of the file",
+        from: {
+          reader: arg(1),
+          decoder: raw,
+        },
+      },
     },
   },
-  output: {
-    type: "string",
-    to: {
-      encoder: raw,
-      writer: file("output.txt"),
-    },
+  create: async (resource, effect) => {
+    effect.info(`Creating file at path: ${resource.id}`);
+    await Deno.writeTextFile(resource.id, resource.contents);
+    return resource;
   },
-  handler: (content, effect) => {
-    effect.info(`With content: ${content}`);
-    return Promise.resolve(content);
+  read: async (id, effect) => {
+    effect.info(`Reading file at path: ${id}`);
+    const contents = await effect.$(`cat ${id}`);
+    return {
+      id,
+      contents: contents.toString(),
+    };
+  },
+  // update: async (resource, _previous, effect) => {
+  //   effect.info(`Updating file at path: ${resource.id}`);
+  //   await effect.$(`echo "${resource.contents}" > ${resource.id}`);
+  //   return resource;
+  // },
+  delete: async (id, _resource, effect) => {
+    effect.info(`Deleting file at path: ${id}`);
+    await effect.$(`rm ${id}`);
   },
 });
 
