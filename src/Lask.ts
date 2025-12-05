@@ -47,13 +47,27 @@ export type Target<T extends JSONType> = {
   encoder: Encoder<T>;
 };
 
-export type InputSchema<T extends JSONSchema = JSONSchema> = T extends JSONSchema
-  ? T & { from?: Source<SchemaToJSONType<T>> }
-  : never;
+export type InputSchema<T extends JSONSchema = JSONSchema> = T extends
+  { type: "object"; properties: infer P } ? P extends { [key: string]: JSONSchema } ?
+      & T
+      & { from?: Source<SchemaToJSONType<T>> }
+      & {
+        properties: {
+          [K in keyof P]: InputSchema<P[K]>;
+        };
+      }
+  : never
+  : T & { from?: Source<SchemaToJSONType<T>> };
 
-export type OutputSchema<T extends JSONSchema = JSONSchema> = T extends JSONSchema
-  ? T & { to?: Target<SchemaToJSONType<T>> }
-  : never;
+export type OutputSchema<T extends JSONSchema = JSONSchema> = T extends
+  { type: "object"; properties: infer P }
+  ? P extends { [key: string]: JSONSchema } ? T & { to?: Target<SchemaToJSONType<T>> } & {
+      properties: {
+        [K in keyof P]: OutputSchema<P[K]>;
+      };
+    }
+  : never
+  : T & { to?: Target<SchemaToJSONType<T>> };
 
 export type Handler<I, O> = (input: I, effect: Effect) => Promise<O> | O;
 
@@ -93,7 +107,7 @@ export class Lask {
     return func;
   }
 
-  async readInput(inputSchema: InputSchema<JSONSchema>): Promise<JSONType> {
+  async readInput(inputSchema: InputSchema): Promise<JSONType> {
     if (inputSchema.from) {
       const rawData = await inputSchema.from.reader.read();
       const decodedData = await inputSchema.from.decoder.decode(rawData);
@@ -123,7 +137,7 @@ export class Lask {
     }
   }
 
-  async writeOutput(outputSchema: OutputSchema<JSONSchema>, output: JSONType) {
+  async writeOutput(outputSchema: OutputSchema, output: JSONType) {
     if (outputSchema.to) {
       const encodedData = await outputSchema.to.encoder.encode(output as never);
       await outputSchema.to.writer.write(encodedData);

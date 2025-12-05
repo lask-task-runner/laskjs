@@ -36,14 +36,14 @@ lask.task("add", {
         type: "number",
         from: {
           reader: arg(0),
-          decoder: json(),
+          decoder: json<number>(),
         },
       },
       b: {
         type: "number",
         from: {
           reader: arg(1),
-          decoder: json(),
+          decoder: json<number>(),
         },
       },
     },
