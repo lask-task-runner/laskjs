@@ -40,11 +40,11 @@ lask.resource("file", {
       contents: contents.toString(),
     };
   },
-  // update: async (resource, _previous, effect) => {
-  //   effect.info(`Updating file at path: ${resource.id}`);
-  //   await effect.$(`echo "${resource.contents}" > ${resource.id}`);
-  //   return resource;
-  // },
+  update: async (resource, _previous, effect) => {
+    effect.info(`Updating file at path: ${resource.id}`);
+    await effect.$(`echo "${resource.contents}" > ${resource.id}`);
+    return resource;
+  },
   delete: async (id, _resource, effect) => {
     effect.info(`Deleting file at path: ${id}`);
     await effect.$(`rm ${id}`);
