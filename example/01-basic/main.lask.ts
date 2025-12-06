@@ -1,6 +1,5 @@
 import { json } from "../../src/Codec/JSON.ts";
 import { raw, stringify } from "../../src/Codec/String.ts";
-import { arg } from "../../src/IO/Command.ts";
 import { stdout } from "../../src/IO/Console.ts";
 import { Lask } from "../../src/Lask.ts";
 
@@ -14,7 +13,7 @@ lask.resource("file", {
         type: "string",
         description: "The path to the file",
         from: {
-          reader: arg(0),
+          reader: lask.args(0),
           decoder: raw,
         },
       },
@@ -22,7 +21,7 @@ lask.resource("file", {
         type: "string",
         description: "The contents of the file",
         from: {
-          reader: arg(1),
+          reader: lask.args(1),
           decoder: raw,
         },
       },
@@ -59,14 +58,14 @@ lask.task("add", {
       a: {
         type: "number",
         from: {
-          reader: arg(0),
+          reader: lask.args(0),
           decoder: json<number>(),
         },
       },
       b: {
         type: "number",
         from: {
-          reader: arg(1),
+          reader: lask.args(1),
           decoder: json<number>(),
         },
       },

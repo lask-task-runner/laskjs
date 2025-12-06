@@ -168,6 +168,16 @@ export class Lask {
     return func;
   }
 
+  args(i: number): Reader {
+    return {
+      read(): Promise<Uint8Array> {
+        return Deno.args[i + 2]
+          ? Promise.resolve(new TextEncoder().encode(Deno.args[i + 2]))
+          : Promise.reject(new Error(`Argument at index ${i} is not provided.`));
+      },
+    };
+  }
+
   async readInput(inputSchema: InputSchema): Promise<JSONType> {
     if (inputSchema.from) {
       const rawData = await inputSchema.from.reader.read();
