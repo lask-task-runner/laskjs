@@ -199,7 +199,7 @@ export class Lask {
     };
   }
 
-  async readInput(inputSchema: InputSchema): Promise<JSONType> {
+  private async readInput(inputSchema: InputSchema): Promise<JSONType> {
     if (inputSchema.from) {
       const rawData = await inputSchema.from.reader.read();
       const decodedData = await inputSchema.from.decoder.decode(rawData);
@@ -229,7 +229,7 @@ export class Lask {
     }
   }
 
-  async writeOutput(outputSchema: OutputSchema, output: JSONType) {
+  private async writeOutput(outputSchema: OutputSchema, output: JSONType) {
     if (outputSchema.to) {
       const encodedData = await outputSchema.to.encoder.encode(output as never);
       await outputSchema.to.writer.write(encodedData);
