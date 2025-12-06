@@ -108,7 +108,6 @@ export type ResourceFunc<R> = {
 
 export class Lask {
   private static readonly LASK_DIR = ".lask";
-  private static readonly HISTORY_DIR = ".lask/history";
 
   private tasks: {
     [key: string]: {
@@ -224,7 +223,7 @@ export class Lask {
     }
   }
 
-  async runTask(taskName: string) {
+  private async runTask(taskName: string) {
     const task = this.tasks[taskName];
 
     if (!task) {
@@ -241,7 +240,7 @@ export class Lask {
     }
   }
 
-  async createResource(resourceName: string) {
+  private async createResource(resourceName: string) {
     const resource = this.resources[resourceName];
 
     if (!resource) {
@@ -256,7 +255,7 @@ export class Lask {
     console.log("Resource created:", createdResource);
   }
 
-  async readResource(resourceName: string) {
+  private async readResource(resourceName: string) {
     const resource = this.resources[resourceName];
 
     if (!resource) {
@@ -271,7 +270,7 @@ export class Lask {
     console.log("Resource read:", readResource);
   }
 
-  async updateResource(resourceName: string) {
+  private async updateResource(resourceName: string) {
     const resource = this.resources[resourceName];
 
     if (!resource) {
@@ -301,7 +300,7 @@ export class Lask {
     }
   }
 
-  async deleteResource(resourceName: string) {
+  private async deleteResource(resourceName: string) {
     const resource = this.resources[resourceName];
 
     if (!resource) {
