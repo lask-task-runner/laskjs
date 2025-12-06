@@ -357,7 +357,8 @@ export class Lask {
         break;
       }
       default:
-        break;
+        console.error(`Unknown command: ${commandName}`);
+        Deno.exit(1);
     }
   }
 }
