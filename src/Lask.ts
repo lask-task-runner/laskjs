@@ -1,3 +1,4 @@
+import { parseArgs } from "@std/cli/parse-args";
 import { Effect } from "./Effect.ts";
 
 export type JSONSchema =
@@ -171,8 +172,14 @@ export class Lask {
   args(i: number): Reader {
     return {
       read(): Promise<Uint8Array> {
-        return Deno.args[i + 2]
-          ? Promise.resolve(new TextEncoder().encode(Deno.args[i + 2]))
+        const parsedArgs = parseArgs(Deno.args, {
+          string: ["_"],
+          stopEarly: true,
+        });
+        const positionalArgs = parsedArgs._.slice(2); // Skip command and subcommand
+        const arg = positionalArgs[i];
+        return arg !== undefined
+          ? Promise.resolve(new TextEncoder().encode(String(arg)))
           : Promise.reject(new Error(`Argument at index ${i} is not provided.`));
       },
     };
@@ -329,31 +336,57 @@ export class Lask {
   }
 
   async bite() {
-    const commandName = Deno.args[0];
+    const parsedArgs = parseArgs(Deno.args, {
+      string: ["_"],
+      stopEarly: true,
+    });
+
+    const [commandName, subCommandName] = parsedArgs._;
+
+    if (!commandName) {
+      console.error("No command specified.");
+      Deno.exit(1);
+    }
+
     switch (commandName) {
       case "run": {
-        const taskName = Deno.args[1];
-        await this.runTask(taskName);
+        if (!subCommandName) {
+          console.error("Task name is required for 'run' command.");
+          Deno.exit(1);
+        }
+        await this.runTask(subCommandName);
         break;
       }
       case "create": {
-        const resourceName = Deno.args[1];
-        await this.createResource(resourceName);
+        if (!subCommandName) {
+          console.error("Resource name is required for 'create' command.");
+          Deno.exit(1);
+        }
+        await this.createResource(subCommandName);
         break;
       }
       case "read": {
-        const resourceName = Deno.args[1];
-        await this.readResource(resourceName);
+        if (!subCommandName) {
+          console.error("Resource name is required for 'read' command.");
+          Deno.exit(1);
+        }
+        await this.readResource(subCommandName);
         break;
       }
       case "update": {
-        const resourceName = Deno.args[1];
-        await this.updateResource(resourceName);
+        if (!subCommandName) {
+          console.error("Resource name is required for 'update' command.");
+          Deno.exit(1);
+        }
+        await this.updateResource(subCommandName);
         break;
       }
       case "delete": {
-        const resourceName = Deno.args[1];
-        await this.deleteResource(resourceName);
+        if (!subCommandName) {
+          console.error("Resource name is required for 'delete' command.");
+          Deno.exit(1);
+        }
+        await this.deleteResource(subCommandName);
         break;
       }
       default:
