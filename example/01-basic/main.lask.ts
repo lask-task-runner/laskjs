@@ -13,7 +13,7 @@ lask.resource("file", {
         type: "string",
         description: "The path to the file",
         from: {
-          reader: lask.args(0),
+          reader: lask.flags("path"),
           decoder: raw,
         },
       },
@@ -21,7 +21,7 @@ lask.resource("file", {
         type: "string",
         description: "The contents of the file",
         from: {
-          reader: lask.args(1),
+          reader: lask.flags("contents"),
           decoder: raw,
         },
       },

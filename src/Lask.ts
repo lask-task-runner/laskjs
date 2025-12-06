@@ -185,6 +185,20 @@ export class Lask {
     };
   }
 
+  flags(name: string): Reader {
+    return {
+      read(): Promise<Uint8Array> {
+        const parsedArgs = parseArgs(Deno.args, {
+          string: [name],
+        });
+        const flagValue = parsedArgs[name];
+        return flagValue !== undefined
+          ? Promise.resolve(new TextEncoder().encode(String(flagValue)))
+          : Promise.reject(new Error(`Flag "${name}" is not provided.`));
+      },
+    };
+  }
+
   async readInput(inputSchema: InputSchema): Promise<JSONType> {
     if (inputSchema.from) {
       const rawData = await inputSchema.from.reader.read();
