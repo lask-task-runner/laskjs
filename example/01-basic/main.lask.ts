@@ -8,8 +8,9 @@ const lask = new Lask();
 lask.resource("file", {
   resource: {
     type: "object",
+    id: "path",
     properties: {
-      id: {
+      path: {
         type: "string",
         description: "The path to the file",
         from: {
@@ -28,23 +29,23 @@ lask.resource("file", {
     },
   },
   create: async (resource, effect) => {
-    effect.info(`Creating file at path: ${resource.id}`);
-    await Deno.writeTextFile(resource.id, resource.contents);
+    effect.info(`Creating file at path: ${resource.path}`);
+    await Deno.writeTextFile(resource.path, resource.contents);
     return resource;
   },
   read: async (id, effect) => {
     effect.info(`Reading file at path: ${id}`);
     const contents = await Deno.readTextFile(id);
-    return { id, contents: contents };
+    return { path: id, contents: contents };
   },
   update: async (resource, _previous, effect) => {
-    effect.info(`Updating file at path: ${resource.id}`);
-    await Deno.writeTextFile(resource.id, resource.contents);
+    effect.info(`Updating file at path: ${resource.path}`);
+    await Deno.writeTextFile(resource.path, resource.contents);
     return resource;
   },
-  delete: async (id, _resource, effect) => {
-    effect.info(`Deleting file at path: ${id}`);
-    await Deno.remove(id);
+  delete: async (path, _resource, effect) => {
+    effect.info(`Deleting file at path: ${path}`);
+    await Deno.remove(path);
   },
 });
 

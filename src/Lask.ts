@@ -73,19 +73,20 @@ export type OutputSchema<T extends JSONSchema = JSONSchema> = T extends
 export type ResourceSchema<
   T extends JSONSchema = {
     type: "object";
-    properties: { id: ResourceId; [key: string]: JSONSchema };
+    properties: { [key: string]: JSONSchema };
     description?: string;
   },
 > = T extends { type: "object"; properties: infer P } ? P extends { [key: string]: JSONSchema } ?
       & T
-      & { from?: Source<SchemaToJSONType<T>> }
       & {
+        id: keyof P;
+        from?: Source<SchemaToJSONType<T>>;
         properties: {
           [K in keyof P]: InputSchema<P[K]>;
         };
       }
   : never
-  : T & { from?: Source<SchemaToJSONType<T>> };
+  : never;
 
 export type ResourceId = { type: "string"; description?: string };
 
@@ -298,7 +299,7 @@ export class Lask {
 
     const { schema, func } = resource;
 
-    const input = await this.readInput(schema.properties.id);
+    const input = await this.readInput(schema.properties[schema.id]);
     const readResource = await func.read(input as never);
     console.log("Resource read:", readResource);
 
@@ -328,7 +329,7 @@ export class Lask {
     } else {
       // delete and recreate
       await func.delete(
-        (input as { id: string }).id as never,
+        (input as { [key: string]: string })[schema.id] as never,
         input as never,
       );
       const createdResource = await func.create(input as never);
@@ -347,7 +348,7 @@ export class Lask {
 
     const { schema, func } = resource;
 
-    const input = await this.readInput(schema.properties.id);
+    const input = await this.readInput(schema.properties[schema.id]);
     const previousResource = await this.readResource(resourceName);
     await func.delete(
       (input as string) as never,
