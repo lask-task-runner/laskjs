@@ -271,7 +271,7 @@ export class Lask {
     }
   }
 
-  private async createResource(resourceName: string) {
+  private async createResource(resourceName: string): Promise<JSONType> {
     const resource = this.resources[resourceName];
 
     if (!resource) {
@@ -284,9 +284,11 @@ export class Lask {
     const input = await this.readInput(schema);
     const createdResource = await func.create(input as never);
     console.log("Resource created:", createdResource);
+
+    return createdResource;
   }
 
-  private async readResource(resourceName: string) {
+  private async readResource(resourceName: string): Promise<JSONType> {
     const resource = this.resources[resourceName];
 
     if (!resource) {
@@ -299,39 +301,11 @@ export class Lask {
     const input = await this.readInput(schema.properties.id);
     const readResource = await func.read(input as never);
     console.log("Resource read:", readResource);
+
+    return readResource;
   }
 
-  private async updateResource(resourceName: string) {
-    const resource = this.resources[resourceName];
-
-    if (!resource) {
-      console.error(`Resource "${resourceName}" not found.`);
-      Deno.exit(1);
-    }
-
-    const { schema, func } = resource;
-
-    if (func.update) {
-      const input = await this.readInput(schema);
-      const previousInput = await this.readInput(schema);
-      const updatedResource = await func.update!(
-        input as never,
-        previousInput as never,
-      );
-      console.log("Resource updated:", updatedResource);
-    } else {
-      // delete and recreate
-      const input = await this.readInput(schema);
-      await func.delete(
-        (input as { id: string }).id as never,
-        input as never,
-      );
-      const createdResource = await func.create(input as never);
-      console.log("Resource updated via delete and recreate:", createdResource);
-    }
-  }
-
-  private async deleteResource(resourceName: string) {
+  private async updateResource(resourceName: string): Promise<JSONType> {
     const resource = this.resources[resourceName];
 
     if (!resource) {
@@ -342,11 +316,44 @@ export class Lask {
     const { schema, func } = resource;
 
     const input = await this.readInput(schema);
+    const previousResource = await this.readResource(resourceName);
+
+    if (func.update) {
+      const updatedResource = await func.update!(
+        input as never,
+        previousResource as never,
+      );
+      console.log("Resource updated:", updatedResource);
+      return updatedResource;
+    } else {
+      // delete and recreate
+      await func.delete(
+        (input as { id: string }).id as never,
+        input as never,
+      );
+      const createdResource = await func.create(input as never);
+      console.log("Resource updated via delete and recreate:", createdResource);
+      return createdResource;
+    }
+  }
+
+  private async deleteResource(resourceName: string): Promise<void> {
+    const resource = this.resources[resourceName];
+
+    if (!resource) {
+      console.error(`Resource "${resourceName}" not found.`);
+      Deno.exit(1);
+    }
+
+    const { schema, func } = resource;
+
+    const input = await this.readInput(schema.properties.id);
+    const previousResource = await this.readResource(resourceName);
     await func.delete(
-      (input as { id: string }).id as never,
-      input as never,
+      (input as string) as never,
+      previousResource as never,
     );
-    console.log("Resource deleted:", (input as { id: string }).id);
+    console.log("Resource deleted:", input as string);
   }
 
   async bite() {
