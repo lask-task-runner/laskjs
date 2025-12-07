@@ -34,20 +34,17 @@ lask.resource("file", {
   },
   read: async (id, effect) => {
     effect.info(`Reading file at path: ${id}`);
-    const contents = await effect.$(`cat ${id}`);
-    return {
-      id,
-      contents: contents.toString(),
-    };
+    const contents = await Deno.readTextFile(id);
+    return { id, contents: contents };
   },
   update: async (resource, _previous, effect) => {
     effect.info(`Updating file at path: ${resource.id}`);
-    await effect.$(`echo "${resource.contents}" > ${resource.id}`);
+    await Deno.writeTextFile(resource.id, resource.contents);
     return resource;
   },
   delete: async (id, _resource, effect) => {
     effect.info(`Deleting file at path: ${id}`);
-    await effect.$(`rm ${id}`);
+    await Deno.remove(id);
   },
 });
 
