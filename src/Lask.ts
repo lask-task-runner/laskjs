@@ -109,6 +109,7 @@ export type ResourceFunc<R> = {
 };
 
 export class Lask {
+  private readonly logger = new Effect("Lask");
   private static readonly LASK_DIR = ".lask";
 
   private tasks: {
@@ -259,7 +260,7 @@ export class Lask {
     const task = this.tasks[taskName];
 
     if (!task) {
-      console.error(`Task "${taskName}" not found.`);
+      this.logger.error(`Task "${taskName}" not found.`);
       Deno.exit(1);
     }
 
@@ -276,7 +277,7 @@ export class Lask {
     const resource = this.resources[resourceName];
 
     if (!resource) {
-      console.error(`Resource "${resourceName}" not found.`);
+      this.logger.error(`Resource "${resourceName}" not found.`);
       Deno.exit(1);
     }
 
@@ -284,7 +285,7 @@ export class Lask {
 
     const input = await this.readInput(schema);
     const createdResource = await func.create(input as never);
-    console.log("Resource created:", createdResource);
+    this.logger.info(`Resource created: ${JSON.stringify(createdResource)}`);
 
     return createdResource;
   }
@@ -293,7 +294,7 @@ export class Lask {
     const resource = this.resources[resourceName];
 
     if (!resource) {
-      console.error(`Resource "${resourceName}" not found.`);
+      this.logger.error(`Resource "${resourceName}" not found.`);
       Deno.exit(1);
     }
 
@@ -301,7 +302,7 @@ export class Lask {
 
     const input = await this.readInput(schema.properties[schema.id]);
     const readResource = await func.read(input as never);
-    console.log("Resource read:", readResource);
+    this.logger.info(`Resource read: ${JSON.stringify(readResource)}`);
 
     return readResource;
   }
@@ -310,7 +311,7 @@ export class Lask {
     const resource = this.resources[resourceName];
 
     if (!resource) {
-      console.error(`Resource "${resourceName}" not found.`);
+      this.logger.error(`Resource "${resourceName}" not found.`);
       Deno.exit(1);
     }
 
@@ -324,7 +325,7 @@ export class Lask {
         input as never,
         previousResource as never,
       );
-      console.log("Resource updated:", updatedResource);
+      this.logger.info(`Resource updated: ${JSON.stringify(updatedResource)}`);
       return updatedResource;
     } else {
       // delete and recreate
@@ -333,7 +334,9 @@ export class Lask {
         input as never,
       );
       const createdResource = await func.create(input as never);
-      console.log("Resource updated via delete and recreate:", createdResource);
+      this.logger.info(
+        `Resource updated via delete and recreate: ${JSON.stringify(createdResource)}`,
+      );
       return createdResource;
     }
   }
@@ -342,7 +345,7 @@ export class Lask {
     const resource = this.resources[resourceName];
 
     if (!resource) {
-      console.error(`Resource "${resourceName}" not found.`);
+      this.logger.error(`Resource "${resourceName}" not found.`);
       Deno.exit(1);
     }
 
@@ -354,7 +357,7 @@ export class Lask {
       (input as string) as never,
       previousResource as never,
     );
-    console.log("Resource deleted:", input as string);
+    this.logger.info(`Resource deleted: ${input as string}`);
   }
 
   async bite() {
@@ -366,14 +369,14 @@ export class Lask {
     const [commandName, subCommandName] = parsedArgs._;
 
     if (!commandName) {
-      console.error("No command specified.");
+      this.logger.error("No command specified.");
       Deno.exit(1);
     }
 
     switch (commandName) {
       case "run": {
         if (!subCommandName) {
-          console.error("Task name is required for 'run' command.");
+          this.logger.error("Task name is required for 'run' command.");
           Deno.exit(1);
         }
         await this.runTask(subCommandName);
@@ -381,7 +384,7 @@ export class Lask {
       }
       case "create": {
         if (!subCommandName) {
-          console.error("Resource name is required for 'create' command.");
+          this.logger.error("Resource name is required for 'create' command.");
           Deno.exit(1);
         }
         await this.createResource(subCommandName);
@@ -389,7 +392,7 @@ export class Lask {
       }
       case "read": {
         if (!subCommandName) {
-          console.error("Resource name is required for 'read' command.");
+          this.logger.error("Resource name is required for 'read' command.");
           Deno.exit(1);
         }
         await this.readResource(subCommandName);
@@ -397,7 +400,7 @@ export class Lask {
       }
       case "update": {
         if (!subCommandName) {
-          console.error("Resource name is required for 'update' command.");
+          this.logger.error("Resource name is required for 'update' command.");
           Deno.exit(1);
         }
         await this.updateResource(subCommandName);
@@ -405,14 +408,14 @@ export class Lask {
       }
       case "delete": {
         if (!subCommandName) {
-          console.error("Resource name is required for 'delete' command.");
+          this.logger.error("Resource name is required for 'delete' command.");
           Deno.exit(1);
         }
         await this.deleteResource(subCommandName);
         break;
       }
       default:
-        console.error(`Unknown command: ${commandName}`);
+        this.logger.error(`Unknown command: ${commandName}`);
         Deno.exit(1);
     }
   }
