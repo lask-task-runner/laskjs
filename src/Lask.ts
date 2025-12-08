@@ -140,6 +140,11 @@ export class Lask {
     };
   } = {};
 
+  use(plugin: Lask): void {
+    Object.assign(this.tasks, plugin.tasks);
+    Object.assign(this.resources, plugin.resources);
+  }
+
   task<
     I extends JSONSchema | undefined = undefined,
     O extends JSONSchema | void = void,
