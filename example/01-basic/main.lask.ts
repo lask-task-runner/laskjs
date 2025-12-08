@@ -83,10 +83,9 @@ lask.task("add", {
 });
 
 lask.task("ls", {
-  handler: async (_inputs, effect) => {
+  handler: async (_input, effect) => {
     effect.info("Listing current directory contents");
     await effect.$("ls -la");
-    return {};
   },
 });
 

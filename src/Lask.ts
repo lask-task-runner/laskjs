@@ -2,19 +2,35 @@ import { parseArgs } from "@std/cli/parse-args";
 import { Effect } from "./Effect.ts";
 
 export type JSONSchema =
-  | { type: "null"; description?: string }
-  | { type: "boolean"; description?: string }
-  | { type: "number"; description?: string }
-  | { type: "string"; description?: string }
-  | { type: "array"; elements: JSONSchema; description?: string }
-  | { type: "object"; properties: { [key: string]: JSONSchema }; description?: string };
+  | JSONObjectSchema
+  | JSONArraySchema
+  | JSONStringSchema
+  | JSONNumberSchema
+  | JSONBooleanSchema
+  | JSONNullSchema
+  | JSONVoidSchema;
 
-export type SchemaToJSONType<T extends JSONSchema> = T extends { type: "null" } ? null
-  : T extends { type: "boolean" } ? boolean
-  : T extends { type: "number" } ? number
-  : T extends { type: "string" } ? string
-  : T extends { type: "array"; elements: infer E }
-    ? E extends JSONSchema ? SchemaToJSONType<E>[] : never
+export type JSONObjectSchema = {
+  type: "object";
+  properties: { [key: string]: JSONSchema };
+  description?: string;
+};
+export type JSONArraySchema = { type: "array"; elements: JSONSchema; description?: string };
+export type JSONStringSchema = { type: "string"; description?: string };
+export type JSONNumberSchema = { type: "number"; description?: string };
+export type JSONBooleanSchema = { type: "boolean"; description?: string };
+export type JSONNullSchema = { type: "null"; description?: string };
+export type JSONVoidSchema = { type: "void"; description?: string };
+
+export type SchemaToJSONType<T extends JSONSchema> = T extends JSONVoidSchema ? void
+  : T extends JSONNullSchema ? null
+  : T extends JSONBooleanSchema ? boolean
+  : T extends JSONNumberSchema ? number
+  : T extends JSONStringSchema ? string
+  : T extends JSONArraySchema
+    ? T extends { type: "array"; elements: infer E }
+      ? E extends JSONSchema ? SchemaToJSONType<E>[] : never
+    : never
   : T extends { type: "object"; properties: infer P }
     ? P extends { [key: string]: JSONSchema } ? { [K in keyof P]: SchemaToJSONType<P[K]> }
     : never
@@ -88,7 +104,7 @@ export type ResourceSchema<
   : never
   : never;
 
-export type ResourceId = { type: "string"; description?: string };
+export type ResourceId = JSONStringSchema;
 
 export type TaskHandler<I, O> = (input: I, effect: Effect) => Promise<O> | O;
 
@@ -110,12 +126,10 @@ export type ResourceFunc<R> = {
 
 export class Lask {
   private readonly logger = new Effect("Lask");
-  private static readonly LASK_DIR = ".lask";
 
   private tasks: {
     [key: string]: {
-      // deno-lint-ignore no-explicit-any
-      func: TaskFunc<any, any>;
+      func: TaskFunc<JSONType | undefined, JSONType | void>;
       inputSchema?: InputSchema<JSONSchema>;
       outputSchema?: OutputSchema<JSONSchema>;
     };
@@ -124,28 +138,42 @@ export class Lask {
   private resources: {
     [key: string]: {
       schema: ResourceSchema;
-      // deno-lint-ignore no-explicit-any
-      func: ResourceFunc<any>;
+      func: ResourceFunc<JSONType>;
     };
   } = {};
 
-  task<I extends JSONSchema, O extends JSONSchema>(
+  task<
+    I extends JSONSchema = { type: "void" },
+    O extends JSONSchema = { type: "void" },
+  >(
     name: string,
-    config: {
+    {
+      input = { type: "void" } as InputSchema<I>,
+      output = { type: "void" } as OutputSchema<O>,
+      handler,
+    }: {
       input?: InputSchema<I>;
       output?: OutputSchema<O>;
-      handler: TaskHandler<SchemaToJSONType<I extends undefined ? void : I>, SchemaToJSONType<O>>;
+      handler: TaskHandler<
+        SchemaToJSONType<I>,
+        SchemaToJSONType<O>
+      >;
     },
-  ): TaskFunc<SchemaToJSONType<I>, SchemaToJSONType<O>> {
-    const { input: inputSchema, output: outputSchema, handler } = config;
-
+  ): TaskFunc<
+    SchemaToJSONType<I>,
+    SchemaToJSONType<O>
+  > {
     const effect = new Effect(`Task#${name}`);
-    // deno-lint-ignore no-explicit-any
-    const func = (input: any): Promise<any> | any => handler(input, effect);
+
+    const func: TaskFunc<
+      SchemaToJSONType<I>,
+      SchemaToJSONType<O>
+    > = (input) => handler(input, effect);
     this.tasks[name] = {
-      func,
-      inputSchema,
-      outputSchema,
+      // deno-lint-ignore no-explicit-any
+      func: func as any,
+      inputSchema: input,
+      outputSchema: output,
     };
     return func;
   }
@@ -155,7 +183,7 @@ export class Lask {
     config: { resource: R } & ResourceHandler<SchemaToJSONType<R>>,
   ): ResourceFunc<SchemaToJSONType<R>> {
     const { resource: schema } = config;
-    const func = {
+    const func: ResourceFunc<SchemaToJSONType<R>> = {
       create: (resource: SchemaToJSONType<R>) =>
         config.create(resource, new Effect(`Resource#${name}#create`)),
       read: (id: SchemaToJSONType<ResourceId>) =>
@@ -167,7 +195,8 @@ export class Lask {
       delete: (id: SchemaToJSONType<ResourceId>, resource: SchemaToJSONType<R>) =>
         config.delete(id, resource, new Effect(`Resource#${name}#delete`)),
     };
-    this.resources[name] = { schema, func };
+    // deno-lint-ignore no-explicit-any
+    this.resources[name] = { schema, func: func as any };
     return func;
   }
 
