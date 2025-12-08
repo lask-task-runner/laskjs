@@ -7,8 +7,7 @@ export type JSONSchema =
   | JSONStringSchema
   | JSONNumberSchema
   | JSONBooleanSchema
-  | JSONNullSchema
-  | JSONVoidSchema;
+  | JSONNullSchema;
 
 export type JSONObjectSchema = {
   type: "object";
@@ -20,9 +19,8 @@ export type JSONStringSchema = { type: "string"; description?: string };
 export type JSONNumberSchema = { type: "number"; description?: string };
 export type JSONBooleanSchema = { type: "boolean"; description?: string };
 export type JSONNullSchema = { type: "null"; description?: string };
-export type JSONVoidSchema = { type: "void"; description?: string };
 
-export type SchemaToJSONType<T extends JSONSchema> = T extends JSONVoidSchema ? void
+export type SchemaToJSONType<T extends JSONSchema> = T extends JSONNullSchema ? null
   : T extends JSONNullSchema ? null
   : T extends JSONBooleanSchema ? boolean
   : T extends JSONNumberSchema ? number
@@ -130,8 +128,8 @@ export class Lask {
   private tasks: {
     [key: string]: {
       func: TaskFunc<JSONType | undefined, JSONType | void>;
-      inputSchema?: InputSchema<JSONSchema>;
-      outputSchema?: OutputSchema<JSONSchema>;
+      inputSchema?: InputSchema<JSONSchema> | undefined;
+      outputSchema?: OutputSchema<JSONSchema> | undefined;
     };
   } = {};
 
@@ -143,31 +141,31 @@ export class Lask {
   } = {};
 
   task<
-    I extends JSONSchema = { type: "void" },
-    O extends JSONSchema = { type: "void" },
+    I extends JSONSchema | undefined = undefined,
+    O extends JSONSchema | void = void,
   >(
     name: string,
     {
-      input = { type: "void" } as InputSchema<I>,
-      output = { type: "void" } as OutputSchema<O>,
+      input,
+      output,
       handler,
     }: {
-      input?: InputSchema<I>;
-      output?: OutputSchema<O>;
+      input?: I extends JSONSchema ? InputSchema<I> : undefined;
+      output?: O extends JSONSchema ? OutputSchema<O> : undefined;
       handler: TaskHandler<
-        SchemaToJSONType<I>,
-        SchemaToJSONType<O>
+        I extends JSONSchema ? SchemaToJSONType<I> : undefined,
+        O extends JSONSchema ? SchemaToJSONType<O> : void
       >;
     },
   ): TaskFunc<
-    SchemaToJSONType<I>,
-    SchemaToJSONType<O>
+    I extends JSONSchema ? SchemaToJSONType<I> : undefined,
+    O extends JSONSchema ? SchemaToJSONType<O> : void
   > {
     const effect = new Effect(`Task#${name}`);
 
     const func: TaskFunc<
-      SchemaToJSONType<I>,
-      SchemaToJSONType<O>
+      I extends JSONSchema ? SchemaToJSONType<I> : undefined,
+      O extends JSONSchema ? SchemaToJSONType<O> : void
     > = (input) => handler(input, effect);
     this.tasks[name] = {
       // deno-lint-ignore no-explicit-any
@@ -297,7 +295,7 @@ export class Lask {
 
     const input: JSONType | undefined = inputSchema ? await this.readInput(inputSchema) : undefined;
     const output = await func(input);
-    if (outputSchema) {
+    if (outputSchema && output) {
       await this.writeOutput(outputSchema, output);
     }
   }
