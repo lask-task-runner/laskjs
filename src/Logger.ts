@@ -1,6 +1,6 @@
 import winston from "npm:winston@3.18.3";
 
-export class LaskLogger {
+export class Logger {
   private logger: winston.Logger;
 
   constructor(name: string) {

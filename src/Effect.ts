@@ -1,10 +1,10 @@
-import { LaskLogger } from "./LaskLogger.ts";
+import { Logger } from "./Logger.ts";
 
 export class Effect {
-  public logger: LaskLogger;
+  public logger: Logger;
 
   constructor(name: string) {
-    this.logger = new LaskLogger(name);
+    this.logger = new Logger(name);
   }
 
   /**
