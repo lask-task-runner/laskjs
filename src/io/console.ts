@@ -1,5 +1,5 @@
 import { readAll } from "jsr:@std/io@0.225.2/read-all";
-import { Reader } from "../Lask.ts";
+import { Reader } from "../lask.ts";
 
 export const stdin: Reader = {
   read(): Promise<Uint8Array> {

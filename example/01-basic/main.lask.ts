@@ -1,7 +1,7 @@
-import { json } from "../../src/Codec/JSON.ts";
-import { raw, stringify } from "../../src/Codec/String.ts";
-import { stdout } from "../../src/IO/Console.ts";
-import { Lask } from "../../src/Lask.ts";
+import { json } from "../../src/codec/json.ts";
+import { raw, stringify } from "../../src/codec/string.ts";
+import { stdout } from "../../src/io/console.ts";
+import { Lask } from "../../src/lask.ts";
 
 const lask = new Lask();
 

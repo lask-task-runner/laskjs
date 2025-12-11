@@ -1,4 +1,4 @@
-import { Reader, Writer } from "../Lask.ts";
+import { Reader, Writer } from "../lask.ts";
 
 export const file = (path: string): Reader & Writer => {
   return {

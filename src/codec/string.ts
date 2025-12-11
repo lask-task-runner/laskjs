@@ -1,4 +1,4 @@
-import { Decoder, Encoder, JSONType } from "../Lask.ts";
+import { Decoder, Encoder, JSONType } from "../lask.ts";
 
 export const raw: Decoder<string> & Encoder<string> = {
   decode(data: Uint8Array): Promise<string> {

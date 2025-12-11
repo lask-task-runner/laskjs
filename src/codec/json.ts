@@ -1,4 +1,4 @@
-import { Decoder, Encoder, JSONType } from "../Lask.ts";
+import { Decoder, Encoder, JSONType } from "../lask.ts";
 
 export function json<T extends JSONType>(): Decoder<T> & Encoder<T> {
   return {

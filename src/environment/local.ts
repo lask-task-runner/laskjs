@@ -1,5 +1,5 @@
-import { Environment } from "../Lask.ts";
-import { Logger } from "../Logger.ts";
+import { Environment } from "../lask.ts";
+import { Logger } from "../logger.ts";
 
 export class LocalEnvironment implements Environment {
   private logger: Logger;

@@ -1,7 +1,7 @@
 import { Docker as DockerAPI } from "node-docker-api";
 import { Buffer } from "node:buffer";
 import type { Readable } from "node:stream";
-import { Environment } from "../Lask.ts";
+import { Environment } from "../lask.ts";
 
 /**
  * Docker API client using Unix socket via node-docker-api

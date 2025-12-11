@@ -1,6 +1,6 @@
-import { LocalEnvironment } from "./Environment/Local.ts";
-import { Environment } from "./Lask.ts";
-import { Logger } from "./Logger.ts";
+import { LocalEnvironment } from "./environment/local.ts";
+import { Environment } from "./lask.ts";
+import { Logger } from "./logger.ts";
 
 export class Effect {
   public logger: Logger;

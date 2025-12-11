@@ -1,5 +1,5 @@
 import { parseArgs } from "@std/cli/parse-args";
-import { Effect } from "./Effect.ts";
+import { Effect } from "./effect.ts";
 
 export type JSONSchema =
   | JSONObjectSchema
