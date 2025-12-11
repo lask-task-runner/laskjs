@@ -122,6 +122,14 @@ export type ResourceFunc<R> = {
   delete: (id: SchemaToJSONType<ResourceId>, resource: R) => Promise<void> | void;
 };
 
+export type TaskOptions = {
+  environment?: Environment;
+};
+
+export interface Environment {
+  $(script: string): Promise<string>;
+}
+
 export class Lask {
   private readonly logger = new Effect("Lask");
 
@@ -153,10 +161,12 @@ export class Lask {
     {
       input,
       output,
+      options,
       handler,
     }: {
       input?: I extends JSONSchema ? InputSchema<I> : undefined;
       output?: O extends JSONSchema ? OutputSchema<O> : undefined;
+      options?: TaskOptions;
       handler: TaskHandler<
         I extends JSONSchema ? SchemaToJSONType<I> : undefined,
         O extends JSONSchema ? SchemaToJSONType<O> : void
@@ -166,7 +176,7 @@ export class Lask {
     I extends JSONSchema ? SchemaToJSONType<I> : undefined,
     O extends JSONSchema ? SchemaToJSONType<O> : void
   > {
-    const effect = new Effect(`Task#${name}`);
+    const effect = new Effect(`Task#${name}`, options?.environment);
 
     const func: TaskFunc<
       I extends JSONSchema ? SchemaToJSONType<I> : undefined,

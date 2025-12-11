@@ -1,10 +1,14 @@
+import { LocalEnvironment } from "./Environment/Local.ts";
+import { Environment } from "./Lask.ts";
 import { Logger } from "./Logger.ts";
 
 export class Effect {
   public logger: Logger;
+  private environment?: Environment;
 
-  constructor(name: string) {
+  constructor(name: string, environment?: Environment) {
     this.logger = new Logger(name);
+    this.environment = environment ? environment : new LocalEnvironment(this.logger);
   }
 
   /**
@@ -13,29 +17,9 @@ export class Effect {
    * Throws an error if the command exits with a non-zero status.
    */
   async $(script: string): Promise<string> {
-    const command = new Deno.Command("sh", {
-      args: ["-c", script],
-      stdout: "piped",
-      stderr: "piped",
-    });
-
-    const child = command.spawn();
-    const output = await child.output();
-
-    const stdout = new TextDecoder().decode(output.stdout);
-    const stderr = new TextDecoder().decode(output.stderr);
-
-    if (output.code !== 0) {
-      this.error(`Command failed with exit code ${output.code}: ${stderr}`);
-      throw new Error(stderr);
-    }
-
-    // Log each line of output
-    stdout.split("\n").forEach((line) => {
-      if (line.trim()) {
-        this.debug(line);
-      }
-    });
+    this.logger.debug(`Executing script: ${script}`);
+    const stdout = await this.environment!.$(script);
+    this.logger.debug(`Script output: ${stdout}`);
 
     return stdout;
   }
