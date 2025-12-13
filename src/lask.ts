@@ -36,21 +36,13 @@ export type SchemaToJSONType<T extends JSONSchema> = T extends JSONNullSchema ? 
 
 export type JSONType = SchemaToJSONType<JSONSchema>;
 
-export interface Reader {
-  read(): Promise<string> | string;
-}
+export type Reader = () => Promise<string> | string;
 
-export interface Writer {
-  write(raw: string): Promise<void> | void;
-}
+export type Writer = (raw: string) => Promise<void> | void;
 
-export interface Decoder<T extends JSONType> {
-  decode(data: string): Promise<T> | T;
-}
+export type Decoder<T extends JSONType> = (data: string) => Promise<T> | T;
 
-export interface Encoder<T extends JSONType> {
-  encode(data: T): Promise<string> | string;
-}
+export type Encoder<T extends JSONType> = (data: T) => Promise<string> | string;
 
 export type Source<T extends JSONType> = {
   reader: Reader;
@@ -214,39 +206,35 @@ export class Lask {
   }
 
   args(i: number): Reader {
-    return {
-      read(): Promise<string> {
-        const parsedArgs = parseArgs(Deno.args, {
-          string: ["_"],
-          stopEarly: true,
-        });
-        const positionalArgs = parsedArgs._.slice(2); // Skip command and subcommand
-        const arg = positionalArgs[i];
-        return arg !== undefined
-          ? Promise.resolve(arg)
-          : Promise.reject(new Error(`Argument at index ${i} is not provided.`));
-      },
+    return (): Promise<string> => {
+      const parsedArgs = parseArgs(Deno.args, {
+        string: ["_"],
+        stopEarly: true,
+      });
+      const positionalArgs = parsedArgs._.slice(2); // Skip command and subcommand
+      const arg = positionalArgs[i];
+      return arg !== undefined
+        ? Promise.resolve(arg)
+        : Promise.reject(new Error(`Argument at index ${i} is not provided.`));
     };
   }
 
   flags(name: string): Reader {
-    return {
-      read(): Promise<string> {
-        const parsedArgs = parseArgs(Deno.args, {
-          string: [name],
-        });
-        const flagValue = parsedArgs[name];
-        return flagValue !== undefined
-          ? Promise.resolve(String(flagValue))
-          : Promise.reject(new Error(`Flag "${name}" is not provided.`));
-      },
+    return (): Promise<string> => {
+      const parsedArgs = parseArgs(Deno.args, {
+        string: [name],
+      });
+      const flagValue = parsedArgs[name];
+      return flagValue !== undefined
+        ? Promise.resolve(String(flagValue))
+        : Promise.reject(new Error(`Flag "${name}" is not provided.`));
     };
   }
 
   private async readInput(inputSchema: InputSchema): Promise<JSONType> {
     if (inputSchema.from) {
-      const rawData = await inputSchema.from.reader.read();
-      const decodedData = await inputSchema.from.decoder.decode(rawData);
+      const rawData = await inputSchema.from.reader();
+      const decodedData = await inputSchema.from.decoder(rawData);
       return decodedData;
     }
 
@@ -275,8 +263,8 @@ export class Lask {
 
   private async writeOutput(outputSchema: OutputSchema, output: JSONType) {
     if (outputSchema.to) {
-      const encodedData = await outputSchema.to.encoder.encode(output as never);
-      await outputSchema.to.writer.write(encodedData);
+      const encodedData = await outputSchema.to.encoder(output as never);
+      await outputSchema.to.writer(encodedData);
     }
 
     switch (outputSchema.type) {

@@ -1,12 +1,15 @@
 import { Decoder, Encoder, JSONType } from "../lask.ts";
 
-export function json<T extends JSONType>(): Decoder<T> & Encoder<T> {
+export function json<T extends JSONType>(): {
+  decoder: Decoder<T>;
+  encoder: Encoder<T>;
+} {
   return {
-    decode(raw: string): T {
+    decoder: (raw: string): T => {
       return JSON.parse(raw);
     },
 
-    encode(raw: T): string {
+    encoder: (raw: T): string => {
       return JSON.stringify(raw, null, 2);
     },
   };

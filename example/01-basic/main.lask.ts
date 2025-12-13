@@ -1,4 +1,3 @@
-import { json } from "../../src/codec/json.ts";
 import { raw, stringify } from "../../src/codec/string.ts";
 import { stdout } from "../../src/io/console.ts";
 import { Lask } from "../../src/lask.ts";
@@ -57,14 +56,14 @@ lask.task("add", {
         type: "number",
         from: {
           reader: lask.args(0),
-          decoder: json<number>(),
+          decoder: Number.parseFloat,
         },
       },
       b: {
         type: "number",
         from: {
           reader: lask.args(1),
-          decoder: json<number>(),
+          decoder: Number.parseFloat,
         },
       },
     },
