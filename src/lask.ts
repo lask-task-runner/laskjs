@@ -37,19 +37,19 @@ export type SchemaToJSONType<T extends JSONSchema> = T extends JSONNullSchema ? 
 export type JSONType = SchemaToJSONType<JSONSchema>;
 
 export interface Reader {
-  read(): Promise<Uint8Array> | Uint8Array;
+  read(): Promise<string> | string;
 }
 
 export interface Writer {
-  write(raw: Uint8Array): Promise<void> | void;
+  write(raw: string): Promise<void> | void;
 }
 
 export interface Decoder<T extends JSONType> {
-  decode(data: Uint8Array): Promise<T> | T;
+  decode(data: string): Promise<T> | T;
 }
 
 export interface Encoder<T extends JSONType> {
-  encode(data: T): Promise<Uint8Array> | Uint8Array;
+  encode(data: T): Promise<string> | string;
 }
 
 export type Source<T extends JSONType> = {
@@ -215,7 +215,7 @@ export class Lask {
 
   args(i: number): Reader {
     return {
-      read(): Promise<Uint8Array> {
+      read(): Promise<string> {
         const parsedArgs = parseArgs(Deno.args, {
           string: ["_"],
           stopEarly: true,
@@ -223,7 +223,7 @@ export class Lask {
         const positionalArgs = parsedArgs._.slice(2); // Skip command and subcommand
         const arg = positionalArgs[i];
         return arg !== undefined
-          ? Promise.resolve(new TextEncoder().encode(String(arg)))
+          ? Promise.resolve(arg)
           : Promise.reject(new Error(`Argument at index ${i} is not provided.`));
       },
     };
@@ -231,13 +231,13 @@ export class Lask {
 
   flags(name: string): Reader {
     return {
-      read(): Promise<Uint8Array> {
+      read(): Promise<string> {
         const parsedArgs = parseArgs(Deno.args, {
           string: [name],
         });
         const flagValue = parsedArgs[name];
         return flagValue !== undefined
-          ? Promise.resolve(new TextEncoder().encode(String(flagValue)))
+          ? Promise.resolve(String(flagValue))
           : Promise.reject(new Error(`Flag "${name}" is not provided.`));
       },
     };
