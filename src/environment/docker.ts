@@ -1,7 +1,8 @@
 import { Docker as DockerAPI } from "node-docker-api";
 import { Buffer } from "node:buffer";
 import type { Readable } from "node:stream";
-import { Environment } from "../lask.ts";
+import { Environment, Prompt, PromptResult } from "../lask.ts";
+import { Logger } from "../logger.ts";
 
 /**
  * Docker API client using Unix socket via node-docker-api
@@ -150,10 +151,14 @@ export interface ContainerConfig {
   Cmd?: string[];
   Env?: string[];
   WorkingDir?: string;
+  AttachStdout?: boolean;
+  AttachStderr?: boolean;
   HostConfig?: {
     Binds?: string[];
     AutoRemove?: boolean;
+    PortBindings?: Record<string, Array<{ HostPort: string }>>;
   };
+  ExposedPorts?: Record<string, Record<string, never>>;
 }
 
 export class DockerEnvironment implements Environment {
@@ -162,17 +167,23 @@ export class DockerEnvironment implements Environment {
   private image: string;
   private workDir: string;
   private autoRemove: boolean;
+  private ports?: Record<string, string>;
+  private logger: Logger;
 
   constructor(options: {
     image: string;
     workDir?: string;
     socketPath?: string;
     autoRemove?: boolean;
+    ports?: Record<string, string>;
+    logger: Logger;
   }) {
     this.client = new DockerClient(options.socketPath);
     this.image = options.image;
     this.workDir = options.workDir || "/workspace";
     this.autoRemove = options.autoRemove ?? true;
+    this.ports = options.ports;
+    this.logger = options.logger;
   }
 
   /**
@@ -183,14 +194,30 @@ export class DockerEnvironment implements Environment {
       return this.containerId;
     }
 
+    // Prepare port bindings if ports are specified
+    const portBindings: Record<string, Array<{ HostPort: string }>> = {};
+    const exposedPorts: Record<string, Record<string, never>> = {};
+
+    if (this.ports) {
+      for (const [containerPort, hostPort] of Object.entries(this.ports)) {
+        const portKey = containerPort.includes("/") ? containerPort : `${containerPort}/tcp`;
+        portBindings[portKey] = [{ HostPort: hostPort }];
+        exposedPorts[portKey] = {};
+      }
+    }
+
     // Create container
     const created = await this.client.createContainer({
       Image: this.image,
       Cmd: ["sleep", "infinity"], // Keep container running
       WorkingDir: this.workDir,
+      AttachStdout: true,
+      AttachStderr: true,
+      ExposedPorts: Object.keys(exposedPorts).length > 0 ? exposedPorts : undefined,
       HostConfig: {
         AutoRemove: this.autoRemove,
         Binds: [`${Deno.cwd()}:${this.workDir}`],
+        PortBindings: Object.keys(portBindings).length > 0 ? portBindings : undefined,
       },
     });
 
@@ -202,25 +229,39 @@ export class DockerEnvironment implements Environment {
     return this.containerId;
   }
 
-  /**
-   * Execute script in Docker container
-   */
-  async $(script: string): Promise<string> {
-    const containerId = await this.ensureContainer();
+  openPrompt(): Prompt {
+    return {
+      id: "docker-prompt",
+      $: async (script: string): Promise<PromptResult> => {
+        const containerId = await this.ensureContainer();
 
-    const result = await this.client.exec(containerId, [
-      "sh",
-      "-c",
-      script,
-    ]);
+        const result = await this.client.exec(containerId, [
+          "sh",
+          "-c",
+          script,
+        ]);
 
-    if (result.exitCode !== 0) {
-      throw new Error(
-        `Command failed with exit code ${result.exitCode}: ${result.stderr}`,
-      );
-    }
+        const { stdout, stderr, exitCode } = result;
 
-    return result.stdout;
+        if (exitCode !== 0) {
+          this.logger.error(`Command failed with exit code ${exitCode}: ${stderr}`);
+          throw new Error(stderr);
+        }
+
+        // Log each line of output
+        stdout.split("\n").forEach((line) => {
+          if (line.trim()) {
+            this.logger.debug(line);
+          }
+        });
+
+        return { stdout, stderr, code: exitCode };
+      },
+    };
+  }
+
+  closePrompt(): void {
+    // Cleanup will be handled separately if needed
   }
 
   /**

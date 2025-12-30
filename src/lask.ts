@@ -119,7 +119,19 @@ export type TaskOptions = {
 };
 
 export interface Environment {
-  $(script: string): Promise<string>;
+  openPrompt(): Promise<Prompt> | Prompt;
+  closePrompt(prompt: Prompt): Promise<void> | void;
+}
+
+export interface Prompt {
+  id: string;
+  $(script: string): Promise<PromptResult>;
+}
+
+export interface PromptResult {
+  stdout: string;
+  stderr: string;
+  code: number;
 }
 
 export class Lask {

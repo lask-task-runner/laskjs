@@ -1,10 +1,10 @@
 import { LocalEnvironment } from "./environment/local.ts";
-import { Environment } from "./lask.ts";
+import { Environment, PromptResult } from "./lask.ts";
 import { Logger } from "./logger.ts";
 
 export class Effect {
   public logger: Logger;
-  private environment?: Environment;
+  private environment: Environment;
 
   constructor(name: string, environment?: Environment) {
     this.logger = new Logger(name);
@@ -16,12 +16,14 @@ export class Effect {
    * Logs stdout and stderr appropriately.
    * Throws an error if the command exits with a non-zero status.
    */
-  async $(script: string): Promise<string> {
+  async $(script: string): Promise<PromptResult> {
     this.logger.debug(`Executing script: ${script}`);
-    const stdout = await this.environment!.$(script);
-    this.logger.debug(`Script output: ${stdout}`);
+    const prompt = await this.environment.openPrompt();
+    const result = await prompt.$(script);
+    this.logger.debug(`Script output: ${result.stdout}`);
+    await this.environment.closePrompt(prompt);
 
-    return stdout;
+    return result;
   }
 
   /**
