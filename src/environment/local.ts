@@ -4,8 +4,8 @@ import { Logger } from "../logger.ts";
 export class LocalEnvironment implements Environment {
   private logger: Logger;
 
-  constructor(logger: Logger) {
-    this.logger = logger;
+  constructor() {
+    this.logger = new Logger("Local#sh");
   }
 
   openPrompt(): Prompt {
@@ -43,7 +43,7 @@ export class LocalEnvironment implements Environment {
     };
   }
 
-  closePrompt(): void {
+  closePrompt(_prompt: Prompt): void {
     // No resources to clean up in local environment
   }
 }
