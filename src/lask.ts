@@ -115,17 +115,27 @@ export type ResourceFunc<R> = {
 };
 
 export type TaskOptions = {
-  environment?: Environment;
+  prompt?:
+    | StatefulPrompt
+    | StatelessPrompt
+    | SingletonPrompt;
 };
 
-export interface Environment {
-  openPrompt(): Promise<Prompt> | Prompt;
-  closePrompt(prompt: Prompt): Promise<void> | void;
+export interface StatefulPrompt {
+  newPrompt():
+    | Promise<(script: string) => Promise<PromptResult>>
+    | ((script: string) => Promise<PromptResult>);
+  cleanupAllPrompts(): Promise<void> | void;
 }
 
-export interface Prompt {
-  id: string;
-  $(script: string): Promise<PromptResult>;
+export interface StatelessPrompt {
+  onetimePrompt(script: string): Promise<PromptResult>;
+}
+
+export interface SingletonPrompt {
+  getPrompt():
+    | Promise<(script: string) => Promise<PromptResult>>
+    | ((script: string) => Promise<PromptResult>);
 }
 
 export interface PromptResult {
@@ -180,12 +190,18 @@ export class Lask {
     I extends JSONSchema ? SchemaToJSONType<I> : undefined,
     O extends JSONSchema ? SchemaToJSONType<O> : void
   > {
-    const effect = new Effect(`Task#${name}`, options?.environment);
+    const effect = new Effect(`Task#${name}`, options?.prompt);
 
     const func: TaskFunc<
       I extends JSONSchema ? SchemaToJSONType<I> : undefined,
       O extends JSONSchema ? SchemaToJSONType<O> : void
-    > = (input) => handler(input, effect);
+    > = async (input) => {
+      try {
+        return await handler(input, effect);
+      } finally {
+        await effect.cleanup();
+      }
+    };
     this.tasks[name] = {
       // deno-lint-ignore no-explicit-any
       func: func as any,

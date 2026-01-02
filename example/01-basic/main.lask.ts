@@ -1,4 +1,5 @@
 import { raw, stringify } from "../../src/codec/string.ts";
+import { Docker } from "../../src/environment/docker.ts";
 import { stdout } from "../../src/io/console.ts";
 import { Lask } from "../../src/lask.ts";
 
@@ -82,6 +83,12 @@ lask.task("add", {
 });
 
 lask.task("ls", {
+  options: {
+    prompt: new Docker({
+      image: "golang:1.20",
+      mountVolume: true,
+    }),
+  },
   handler: async (_input, effect) => {
     effect.info("Listing current directory contents");
     await effect.$("ls -la");
