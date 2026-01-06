@@ -1,5 +1,6 @@
 import { parseArgs } from "@std/cli/parse-args";
-import { Effect } from "./effect.ts";
+import { createEffect } from "./effect.ts";
+import { Logger } from "./logger.ts";
 
 export type JSONSchema =
   | JSONObjectSchema
@@ -96,13 +97,19 @@ export type ResourceSchema<
 
 export type ResourceId = JSONStringSchema;
 
-export type TaskHandler<I, O> = (input: I, effect: Effect) => Promise<O> | O;
+// TODO: generics P for Prompt
+export type TaskHandler<I, O> = (input: I, effect: Effect<Prompt>) => Promise<O> | O;
 
+// TODO: generics R for Resource
 export type ResourceHandler<R> = {
-  create: (resource: R, effect: Effect) => Promise<R> | R;
-  read: (id: SchemaToJSONType<ResourceId>, effect: Effect) => Promise<R> | R;
-  update?: (resource: R, previous: R, effect: Effect) => Promise<R> | R;
-  delete: (id: SchemaToJSONType<ResourceId>, resource: R, effect: Effect) => Promise<void> | void;
+  create: (resource: R, effect: Effect<Prompt>) => Promise<R> | R;
+  read: (id: SchemaToJSONType<ResourceId>, effect: Effect<Prompt>) => Promise<R> | R;
+  update?: (resource: R, previous: R, effect: Effect<Prompt>) => Promise<R> | R;
+  delete: (
+    id: SchemaToJSONType<ResourceId>,
+    resource: R,
+    effect: Effect<Prompt>,
+  ) => Promise<void> | void;
 };
 
 export type TaskFunc<I, O> = (input: I) => Promise<O> | O;
@@ -115,11 +122,26 @@ export type ResourceFunc<R> = {
 };
 
 export type TaskOptions = {
-  prompt?:
-    | StatefulPrompt
-    | StatelessPrompt
-    | SingletonPrompt;
+  prompt?: Prompt;
 };
+
+export type Prompt = StatefulPrompt | StatelessPrompt | SingletonPrompt;
+
+export type Effect<P extends Prompt> = Logger & PromptEffect<P>;
+
+export type PromptEffect<P extends Prompt> =
+  & (P extends StatefulPrompt ? {
+      newPrompt(): Promise<(script: string) => Promise<PromptResult>>;
+    }
+    : Record<PropertyKey, never>)
+  & (P extends StatelessPrompt ? {
+      runPrompt(script: string): Promise<PromptResult>;
+    }
+    : Record<PropertyKey, never>)
+  & (P extends SingletonPrompt ? {
+      getPrompt(): Promise<(script: string) => Promise<PromptResult>>;
+    }
+    : Record<PropertyKey, never>);
 
 export interface StatefulPrompt {
   newPrompt():
@@ -145,7 +167,7 @@ export interface PromptResult {
 }
 
 export class Lask {
-  private readonly logger = new Effect("Lask");
+  private readonly logger = createEffect("Lask");
 
   private tasks: {
     [key: string]: {
@@ -190,17 +212,13 @@ export class Lask {
     I extends JSONSchema ? SchemaToJSONType<I> : undefined,
     O extends JSONSchema ? SchemaToJSONType<O> : void
   > {
-    const effect = new Effect(`Task#${name}`, options?.prompt);
+    const effect = createEffect(`Task#${name}`, options?.prompt);
 
     const func: TaskFunc<
       I extends JSONSchema ? SchemaToJSONType<I> : undefined,
       O extends JSONSchema ? SchemaToJSONType<O> : void
     > = async (input) => {
-      try {
-        return await handler(input, effect);
-      } finally {
-        await effect.cleanup();
-      }
+      return await handler(input, effect);
     };
     this.tasks[name] = {
       // deno-lint-ignore no-explicit-any
@@ -218,15 +236,15 @@ export class Lask {
     const { resource: schema } = config;
     const func: ResourceFunc<SchemaToJSONType<R>> = {
       create: (resource: SchemaToJSONType<R>) =>
-        config.create(resource, new Effect(`Resource#${name}#create`)),
+        config.create(resource, createEffect(`Resource#${name}#create`)),
       read: (id: SchemaToJSONType<ResourceId>) =>
-        config.read(id, new Effect(`Resource#${name}#read`)),
+        config.read(id, createEffect(`Resource#${name}#read`)),
       update: config.update
         ? (resource: SchemaToJSONType<R>, previous: SchemaToJSONType<R>) =>
-          config.update!(resource, previous, new Effect(`Resource#${name}#update`))
+          config.update!(resource, previous, createEffect(`Resource#${name}#update`))
         : undefined,
       delete: (id: SchemaToJSONType<ResourceId>, resource: SchemaToJSONType<R>) =>
-        config.delete(id, resource, new Effect(`Resource#${name}#delete`)),
+        config.delete(id, resource, createEffect(`Resource#${name}#delete`)),
     };
     // deno-lint-ignore no-explicit-any
     this.resources[name] = { schema, func: func as any };

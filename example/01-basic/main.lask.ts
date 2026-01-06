@@ -91,7 +91,7 @@ lask.task("ls", {
   },
   handler: async (_input, effect) => {
     effect.info("Listing current directory contents");
-    await effect.$("ls -la");
+    await effect.runPrompt("ls -la");
   },
 });
 
