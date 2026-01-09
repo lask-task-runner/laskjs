@@ -12,7 +12,7 @@ lask.task("serve", {
   },
   handler: async (_input, effect) => {
     effect.info("Starting Go web server...");
-    await effect.$("go run main.go");
+    await effect.runPrompt("go run main.go");
   },
 });
 
