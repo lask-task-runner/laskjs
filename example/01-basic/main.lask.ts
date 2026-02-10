@@ -91,7 +91,9 @@ lask.task("ls", {
   },
   handler: async (_input, effect) => {
     effect.info("Listing current directory contents");
-    await effect.runPrompt("ls -la");
+    const $ = await effect.newPrompt();
+    await $("ls -la");
+    await $("go version");
   },
 });
 
